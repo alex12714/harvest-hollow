@@ -11,6 +11,7 @@
 //                                           build the form again in another language without losing a word
 import { t, lang as pageLang } from '../i18n/front.js';
 import { IDEAS_URL, PRIVACY_PATH } from './links.js';
+import { url } from '../net/base.js';
 
 export { REPO_URL, IDEAS_URL, SELF_HOST_URL } from './links.js';
 export const CATEGORIES = Object.freeze([['content', '🌱'], ['feature', '✨'], ['bug', '🐛'], ['other', '💬']]);
@@ -40,7 +41,7 @@ export async function sendIdea(fetcher, { category, text, name = '', contact = '
   if (website) body.website = website;
   let res;
   try {
-    res = await fetcher('/api/ideas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
+    res = await fetcher(url('/api/ideas'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
   } catch { return { ok: false, code: 'NET' }; }
   let json = null;
   try { json = await res.json(); } catch { json = null; }
@@ -109,7 +110,7 @@ export function ideaForm({ prefix = 'idea', farm = null, fetcher = (u, o) => glo
       el('div.idea-field', {}, el('label.idea-label', { for: id('contact') }, t('front.ideas.contact'), optional()), contact,
         // the small print: what the contact is for, and the privacy note (a new tab: the words typed here stay)
         el('p.idea-hint', { id: id('contact-hint') }, t('front.ideas.contactHint'), el('span', { 'aria-hidden': 'true', text: ' · ' }),
-          el('a.idea-privacy-link', { href: PRIVACY_PATH, target: '_blank', rel: 'noopener', text: t('front.ideas.privacyLink') })))),
+          el('a.idea-privacy-link', { href: url(PRIVACY_PATH), target: '_blank', rel: 'noopener', text: t('front.ideas.privacyLink') })))),
     otherErr,
     el('div.idea-trap', { 'aria-hidden': 'true' }, el('label', { for: id('website'), text: t('front.ideas.trap') }), trap),
     el('p.idea-privacy', { text: t('front.ideas.privacy') }),

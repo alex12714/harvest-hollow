@@ -42,6 +42,7 @@
 //                    own: { done, active, queued } }   (tests, tools/boot-perf)
 //   resetPacks(ix)      tests: use index `ix` (undefined: read the page again), forget everything
 import { ASSET_BASE, assetPath, fetchAsset } from './asset-base.js';
+import { BASE } from './base.js';
 import { PRIO, PREFETCHABLE, SINGLE_SHARE, firstViewPacks, firstViewFiles, modelPath } from '../../../shared/net/packs-plan.js';
 
 export { PRIO, PREFETCHABLE, SINGLE_SHARE, firstViewPacks, firstViewFiles, modelPath };
@@ -347,7 +348,8 @@ function modeOf(hit) {
 
 /** The pack's bytes: from the host's root on a host page, from this server when that fails. */
 async function fetchPack(hit, fetcher) {
-  const url = `${PACK_ORIGIN}/assets/packs/${hit.id}.bin?v=${hit.p.v}`;
+  // the host's root, else this server (under its path prefix, net/base.js)
+  const url = `${PACK_ORIGIN || BASE}/assets/packs/${hit.id}.bin?v=${hit.p.v}`;
   try {
     const r = await fetchAsset(url, undefined, fetcher);
     return r && r.ok ? await r.arrayBuffer() : null;

@@ -373,12 +373,15 @@ test('telemetry: GET/POST /consent: the farmer\'s own choice only, a boolean onl
 
 test('telemetry config: defaults, off switches, and refused values', () => {
   const d = telemetryConfig({});
-  assert.deepEqual(d, { enabled: true, url: DEFAULT_TELEMETRY_URL, urlExplicit: false, receive: false, perDay: 5000 });
+  assert.deepEqual(d, { enabled: true, url: DEFAULT_TELEMETRY_URL, urlExplicit: false, receive: null, perDay: 5000 });
   assert.equal(telemetryConfig({ HH_TELEMETRY: 'off' }).enabled, false);
   assert.equal(telemetryConfig({ HH_TELEMETRY_URL: 'off' }).url, null);
   assert.equal(telemetryConfig({ HH_TELEMETRY_URL: 'http://127.0.0.1:4340/api/telemetry' }).urlExplicit, true);
   assert.equal(telemetryConfig({ HH_TELEMETRY_RECEIVE: '1' }).receive, true);
-  for (const env of [{ HH_TELEMETRY_URL: 'ftp://x/y' }, { HH_TELEMETRY_URL: 'not a url' }, { HH_TELEMETRY_URL: 'https://user:pw@host/x' },
+  assert.equal(telemetryConfig({ HH_TELEMETRY_RECEIVE: 'on' }).receive, true);
+  assert.equal(telemetryConfig({ HH_TELEMETRY_RECEIVE: 'off' }).receive, false);
+  assert.equal(telemetryConfig({ HH_TELEMETRY_RECEIVE: '0' }).receive, false);
+  for (const env of [{ HH_TELEMETRY_RECEIVE: 'maybe' }, { HH_TELEMETRY_URL: 'ftp://x/y' }, { HH_TELEMETRY_URL: 'not a url' }, { HH_TELEMETRY_URL: 'https://user:pw@host/x' },
     { HH_TELEMETRY_PER_DAY: '0' }, { HH_TELEMETRY_PER_DAY: 'many' }]) {
     assert.throws(() => telemetryConfig(env), /HH_TELEMETRY/, JSON.stringify(env));
   }

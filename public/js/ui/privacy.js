@@ -13,6 +13,7 @@ import { h } from './dom.js';
 import { farm, session, deleteFarm } from '../net/farm.js';
 import { ownFarmName } from '../../../shared/brand.js';
 import { PRIVACY_PATH, PRIVACY_MD_URL } from '../front/links.js';
+import { url } from '../net/base.js';
 import { t } from '../i18n/index.js';
 
 export const FARM_DELETED_EVENT = 'hh:farm-deleted';
@@ -48,7 +49,7 @@ export function createPrivacyUi(S, opts = {}) {
   }
 
   const link = () => (multi
-    ? h('a.btn.btn--paper.btn--small', { href: PRIVACY_PATH, target: '_blank', rel: 'noopener', dataset: { privacy: 'open' } }, t('privacy.link'))
+    ? h('a.btn.btn--paper.btn--small', { href: url(PRIVACY_PATH), target: '_blank', rel: 'noopener', dataset: { privacy: 'open' } }, t('privacy.link'))
     : h('a.btn.btn--paper.btn--small', { href: PRIVACY_MD_URL, target: '_blank', rel: 'noopener noreferrer', dataset: { privacy: 'open' } }, t('privacy.link')));
 
   function settingsRows(ctx) {

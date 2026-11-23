@@ -16,6 +16,7 @@
 //
 // The provider routes are not spelled out in the contract (4.3 "see 5.3"): ROUTES below is the one place that names
 // them (docs/agent-notes/hh-ui.md has the proposal sent to the agent lane).
+import { url } from '../net/base.js';
 
 const JSON_TYPE = 'application/json';
 
@@ -42,7 +43,7 @@ export const ROUTES = Object.freeze({
 
 /** The harness base of a farm scope (net/farm.js `farm`). Pure. */
 export function harnessBase(scope) {
-  return scope && scope.multi && scope.id ? `/api/f/${encodeURIComponent(scope.id)}/harness` : '/api/harness';
+  return url(scope && scope.multi && scope.id ? `/api/f/${encodeURIComponent(scope.id)}/harness` : '/api/harness');
 }
 
 /** '/jobs/:job/apply' with { job: 'ab12' } -> '/jobs/ab12/apply' (every part URI-encoded). Pure. */

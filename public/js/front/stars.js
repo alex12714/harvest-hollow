@@ -6,12 +6,13 @@
 //   starCount({ fetcher }) -> Promise<number | null>      never throws
 //   shortCount(n) -> '42' | '1.2k'                        pure
 export const STARS_PATH = '/api/stars';
+import { url } from '../net/base.js';
 
 export async function starCount({ fetcher = (u, o) => globalThis.fetch(u, o) } = {}) {
   try {
     const ctl = typeof AbortController === 'function' ? new AbortController() : null;
     const t = ctl ? setTimeout(() => ctl.abort(), 5000) : 0;
-    const res = await fetcher(STARS_PATH, { headers: { accept: 'application/json' }, signal: ctl?.signal });
+    const res = await fetcher(url(STARS_PATH), { headers: { accept: 'application/json' }, signal: ctl?.signal });
     clearTimeout(t);
     if (!res.ok) return null;
     const n = (await res.json())?.stars;

@@ -32,7 +32,10 @@
   <script>
     (function () {
       try {
-        var m = /^\/f\/([A-Za-z0-9_-]{6,64})\/?$/.exec(location.pathname);
+        // a page under a path prefix names it (<meta name="hh-base">, server/base-path.js): the routes start after it
+        var B = (document.querySelector('meta[name="hh-base"]') || { content: '' }).content || '';
+        var p = B && location.pathname.indexOf(B + '/') === 0 ? location.pathname.slice(B.length) : location.pathname;
+        var m = /^\/f\/([A-Za-z0-9_-]{6,64})\/?$/.exec(p);
         var pre = m ? 'hh.f.' + m[1] + '.' : 'hh.';
         var tk = JSON.parse(localStorage.getItem(pre + 'tokens') || 'null');
         // a ?slot= with a name= claims at once (the e2e tools' fresh farms): the picker never shows (QA r2 S-17)
@@ -235,7 +238,7 @@
       } catch (e) { /* no observer: the line stays words only */ }
       // the home-screen app's description in the chosen language (the name stays "Harness Hollow")
       var mf = document.querySelector('link[rel="manifest"]');
-      if (mf && L === 'bg') mf.setAttribute('href', '/manifest.bg.webmanifest');
+      if (mf && L === 'bg') mf.setAttribute('href', String(mf.getAttribute('href')).replace(/manifest\.webmanifest$/, 'manifest.bg.webmanifest'));
       for (var i = 0; i < opts.length; i++) {
         opts[i].addEventListener('click', function (e) {
           var l = e.currentTarget.getAttribute('data-lang');

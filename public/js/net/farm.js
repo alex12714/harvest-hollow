@@ -27,6 +27,7 @@
 import { t } from '../i18n/multi.js';
 import { BRAND, ownFarmName } from '../../../shared/brand.js';
 import { cleanText } from '../../../shared/net/text.js';
+import { BASE, url, pagePath } from './base.js';
 
 /** A farm id in a page path: the server's ids are >= 10 base32 characters; accept the URL-safe alphabet. */
 export const FARM_PATH = /^\/f\/([A-Za-z0-9_-]{6,64})\/?$/;
@@ -46,7 +47,7 @@ const farmOwned = (k) => FARM_KEYS.has(k) || FARM_PREFIXES.some((p) => k.startsW
 export const validSecret = (s) => (typeof s === 'string' && SECRET_RE.test(s) ? s : null);
 
 export const farmIdOf = (pathname) => {
-  const m = FARM_PATH.exec(String(pathname ?? ''));
+  const m = FARM_PATH.exec(pagePath(String(pathname ?? '')));
   return m ? m[1] : null;
 };
 
@@ -58,12 +59,12 @@ export function createFarmScope(id) {
     multi,
     /** 'hh.tokens' -> 'hh.f.<id>.tokens' for a farm's own keys in multi mode; device keys and single mode unchanged. */
     key: (k) => (multi && typeof k === 'string' && farmOwned(k) ? `hh.f.${fid}.${k.slice(3)}` : k),
-    /** '/api/status' -> '/api/f/<id>/status' in multi mode. */
-    api: (p) => (multi && typeof p === 'string' && p.startsWith('/api/') ? `/api/f/${fid}/${p.slice(5)}` : p),
-    wsUrl: (loc) => `${loc.protocol === 'https:' ? 'wss' : 'ws'}://${loc.host}/ws${multi ? `?farm=${encodeURIComponent(fid)}` : ''}`,
+    /** '/api/status' -> '/api/f/<id>/status' in multi mode (under the page's path prefix, net/base.js). */
+    api: (p) => url(multi && typeof p === 'string' && p.startsWith('/api/') ? `/api/f/${fid}/${p.slice(5)}` : p),
+    wsUrl: (loc) => `${loc.protocol === 'https:' ? 'wss' : 'ws'}://${loc.host}${BASE}/ws${multi ? `?farm=${encodeURIComponent(fid)}` : ''}`,
     /** An IndexedDB name (the Memory Book's pictures belong to the farm). */
     idb: (name) => (multi ? `${name}.${fid}` : name),
-    path: multi ? `/f/${fid}` : '/',
+    path: url(multi ? `/f/${fid}` : '/'),
   });
 }
 
@@ -106,9 +107,9 @@ export function inviteNotice({ join, sentJoin, saved }) {
   return saved.token === join ? 'own' : null;
 }
 
-export const personalLink = (origin, id, secret) => `${origin}/f/${encodeURIComponent(id)}#k=${encodeURIComponent(secret)}`;
-export const inviteLink = (origin, id, token) => `${origin}/f/${encodeURIComponent(id)}?join=${encodeURIComponent(token)}`;
-export const rejoinLink = (origin, id, token) => `${origin}/f/${encodeURIComponent(id)}?rejoin=${encodeURIComponent(token)}`;
+export const personalLink = (origin, id, secret) => `${origin}${BASE}/f/${encodeURIComponent(id)}#k=${encodeURIComponent(secret)}`;
+export const inviteLink = (origin, id, token) => `${origin}${BASE}/f/${encodeURIComponent(id)}?join=${encodeURIComponent(token)}`;
+export const rejoinLink = (origin, id, token) => `${origin}${BASE}/f/${encodeURIComponent(id)}?rejoin=${encodeURIComponent(token)}`;
 
 /**
  * A pasted or scanned farm link (or just its '#k=…' part, for this farm) -> { id, key, join, rejoin } | null. Pure: the
@@ -231,7 +232,7 @@ export function browserTz() {
 export async function startFarm(fetcher = globalThis.fetch, { tz = browserTz() } = {}) {
   let res;
   try {
-    res = await fetcher('/api/farms', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(tz ? { tz } : {}) });
+    res = await fetcher(url('/api/farms'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(tz ? { tz } : {}) });
   } catch { return { ok: false, code: 'NET' }; }
   const body = await jsonOf(res);
   if (res.ok && body && createFarmScope(body.id).multi && validSecret(body.secret)) return { ok: true, id: body.id, secret: body.secret };
@@ -245,7 +246,7 @@ export async function createInvite(fetcher, id, secret) {
   if (!createFarmScope(id).multi || !validSecret(secret)) return { ok: false, code: 'AUTH' };
   let res;
   try {
-    res = await fetcher(`/api/f/${encodeURIComponent(id)}/invite`, {
+    res = await fetcher(url(`/api/f/${encodeURIComponent(id)}/invite`), {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
       body: JSON.stringify({ secret }),
@@ -267,7 +268,7 @@ export async function createRekey(fetcher, id, secret, pid) {
   if (!createFarmScope(id).multi || !validSecret(secret) || typeof pid !== 'string') return { ok: false, code: 'AUTH' };
   let res;
   try {
-    res = await fetcher(`/api/f/${encodeURIComponent(id)}/rekey`, {
+    res = await fetcher(url(`/api/f/${encodeURIComponent(id)}/rekey`), {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
       body: JSON.stringify({ pid }),
@@ -292,7 +293,7 @@ export async function deleteFarm(fetcher, id, secret) {
   if (!createFarmScope(id).multi || !validSecret(secret)) return { ok: false, code: 'AUTH' };
   let res;
   try {
-    res = await fetcher(`/api/f/${encodeURIComponent(id)}/delete`, {
+    res = await fetcher(url(`/api/f/${encodeURIComponent(id)}/delete`), {
       method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` }, body: '{}', cache: 'no-store' });
   } catch { return { ok: false, code: 'NET' }; }
   const body = await jsonOf(res);
@@ -307,7 +308,7 @@ export async function deleteFarm(fetcher, id, secret) {
 export async function farmStatus(fetcher, id, secret) {
   if (!createFarmScope(id).multi) return null;
   try {
-    const res = await fetcher(`/api/f/${encodeURIComponent(id)}/status`, {
+    const res = await fetcher(url(`/api/f/${encodeURIComponent(id)}/status`), {
       headers: validSecret(secret) ? { authorization: `Bearer ${secret}` } : {}, cache: 'no-store' });
     return res.ok ? await jsonOf(res) : null;
   } catch { return null; }

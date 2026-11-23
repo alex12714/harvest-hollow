@@ -98,6 +98,7 @@ import { createRecap } from './recap.js';
 import { createNaming } from './naming.js';
 import { createTutorial } from './tutorial.js';
 import { createIdeasUi } from './ideas.js';
+import { url as baseUrl, pagePath } from '../net/base.js';
 import { createStarNudge } from './star-nudge.js';
 import { createTracker } from './tracker.js';
 import { createSeeds } from './seeds.js';
@@ -898,7 +899,8 @@ export const ui = {
     // multi-farm mode only (null otherwise): "Keep your farm safe", the Farmers' new keys (ui/keep.js)
     ctx.keep = createKeepUi(ctx);
     // "Suggest an idea" (every mode; a self-hosted farm's entry opens GitHub) and the GitHub star card (multi only)
-    ctx.ideas = createIdeasUi(ctx);
+    // (off when the host turned its ideas box off: <meta name="hh-ideas" content="off">, HH_IDEAS=off)
+    ctx.ideas = document.querySelector?.('meta[name="hh-ideas"]')?.getAttribute('content') === 'off' ? null : createIdeasUi(ctx);
     // Settings > Farm's Privacy section (every mode) and "Delete this farm now" (multi only): ui/privacy.js
     ctx.privacy = createPrivacyUi(ctx);
     const hud = createHud(ctx);
@@ -1404,8 +1406,8 @@ if (typeof document !== 'undefined') {
     const mf = document.querySelector?.('link[rel="manifest"]');
     const href = String(mf?.getAttribute('href') ?? '');
     if (!mf || href.startsWith('data:')) return;
-    if (href.startsWith('/f/')) mf.setAttribute('href', farmManifestHref(href, l));
-    else mf.setAttribute('href', l === 'bg' ? '/manifest.bg.webmanifest' : '/manifest.webmanifest');
+    if (pagePath(href).startsWith('/f/')) mf.setAttribute('href', farmManifestHref(href, l));
+    else mf.setAttribute('href', baseUrl(l === 'bg' ? '/manifest.bg.webmanifest' : '/manifest.webmanifest'));
   });
   onLang(() => {
     const b = $('boot');

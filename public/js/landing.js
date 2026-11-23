@@ -15,6 +15,7 @@ import { createFarmScope, farmsOnDevice, forgetFarm, rememberFarm, startFarm, fa
 import { t, ready, loaded, onLang, applyStatic, retell } from './i18n/front.js';
 import { langToggle } from './ui/lang-toggle.js';
 import { assetUrl } from './net/asset-base.js';
+import { url } from './net/base.js';
 
 const $ = (id) => document.getElementById(id);
 const st = (() => { try { return globalThis.localStorage ?? null; } catch { return null; } })();
@@ -49,7 +50,7 @@ function renderFarms() {
     li.className = 'ld-farm';
     const a = document.createElement('a');
     a.className = 'ld-open';
-    a.href = `/f/${encodeURIComponent(f.id)}`;
+    a.href = url(`/f/${encodeURIComponent(f.id)}`);
     const txt = Object.assign(document.createElement('span'), { className: 'ld-open-txt' });
     // dir=auto isolates a right-to-left farm name from the line around it (QA r1 I-02)
     txt.append(Object.assign(document.createElement('span'), { className: 'ld-name', dir: 'auto', textContent: name }),
@@ -99,7 +100,7 @@ async function start() {
     rememberFarm(st, { id: r.id });
     status.textContent = t('front.start.ready');
     // the secret stays out of the address: the game reads it from this device's storage
-    location.assign(`/f/${encodeURIComponent(r.id)}`);
+    location.assign(url(`/f/${encodeURIComponent(r.id)}`));
     return;
   }
   playReady();
@@ -288,7 +289,7 @@ async function boot() {
   const standalone = isStandalone();
   const newest = farmsOnDevice(st)[0];
   if (standalone && newest && !new URLSearchParams(location.search).has('home')) {
-    location.replace(`/f/${encodeURIComponent(newest.id)}`);
+    location.replace(url(`/f/${encodeURIComponent(newest.id)}`));
     return;
   }
   // the language first (Bulgarian loads only when chosen), then the words, then the page shows
@@ -320,6 +321,8 @@ async function boot() {
     openBack(e.currentTarget);
     buildBack().then(() => $('ld-back').querySelector('input')?.focus()).catch((err) => console.error('landing: the way back failed to load', err));
   });
+  // a host without an ideas box (HH_IDEAS=off renders <meta name="hh-ideas" content="off">) shows no entry for it
+  if (document.querySelector('meta[name="hh-ideas"]')?.getAttribute('content') === 'off') $('ld-ideas-open').style.display = 'none';
   $('ld-ideas-open').addEventListener('click', (e) => {
     openIdeas(e.currentTarget);
     buildIdeas().catch((err) => console.error('landing: the ideas form failed to load', err));

@@ -15,6 +15,7 @@ import { AssetOrigin } from './asset-origin.js';
 import { firstViewPacks, modelFileOf, packShares, PREFETCHABLE, SINGLE_SHARE } from '../shared/net/packs-plan.js';
 import { spawnAt } from '../shared/rules/grid.js';
 import { farmMethods } from './farm-host.js';
+import { publicAlias } from './base-path.js';
 
 export const isLoopback = (ip) => ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
 
@@ -69,13 +70,24 @@ export function status(hh) {
  * HH_ASSET_HOST=off), asset packs, versioned/gzip'ed files, vendored three.js, shared modules, public/. Shared by the
  * single-farm app and the multi-farm host (server/multi.js).
  */
-export function mountAssets(app, staticFiles, root, { host = true } = {}) {
+export function mountAssets(app, staticFiles, root, { host = true, base = '' } = {}) {
+  if (base) app.use(publicAlias());          // HH_BASE_PATH: <base>/public/{js,css,assets}/... (server/base-path.js)
   app.use(staticFiles.serveBuild({ enabled: host }));
   app.use(staticFiles.servePacks());        // /assets/packs/<id>.bin: a model family or the sounds in one response (qa2 SV-03)
   app.use(staticFiles.serveFiles());
   app.use('/vendor/three', express.static(path.join(root, 'node_modules', 'three'), staticOpts));
   app.use('/shared', express.static(path.join(root, 'shared'), staticOpts));
   app.use(express.static(path.join(root, 'public'), staticOpts));
+}
+
+/**
+ * HH_FRAME_ANCESTORS (cfg.frameAncestors): who may show the game in a frame, as a CSP `frame-ancestors` header on every
+ * answer (browsers apply it to documents only). A route that sets its own stricter policy (the ideas admin, the
+ * helper's pages) replaces it. null: no header, as before.
+ */
+export function frameAncestors(sources) {
+  const value = `frame-ancestors ${sources}`;
+  return (_req, res, next) => { res.setHeader('Content-Security-Policy', value); next(); };
 }
 
 /**
@@ -136,10 +148,11 @@ export function firstPacksHint(hh) {
 /** @param {object} hh  the server context ({ cfg, engine, sessions, clock, scheduler, persist, static? }) */
 export function createApp(hh) {
   const { root } = hh.cfg;
-  hh.static ??= new StaticFiles({ root, log: hh.log });
+  hh.static ??= new StaticFiles({ root, log: hh.log, basePath: hh.cfg.basePath });
   const app = express();
   app.disable('x-powered-by');
   app.use((_req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
+  if (hh.cfg.frameAncestors) app.use(frameAncestors(hh.cfg.frameAncestors));
   // option 2 (HH_ASSET_ORIGIN): the public host's build, checked now and every HH_ASSET_CHECK_MS; each page request
   // gets the host variant only when server/asset-origin.js says so, and a self page that may one day get it carries
   // the once-per-browser integrity probe
@@ -155,7 +168,7 @@ export function createApp(hh) {
     return { base, probe: true, hint: base ? firstPacksHint(hh) : null };
   }));
   app.use(hh.static.serveSriProbe());
-  mountAssets(app, hh.static, root, { host: assets?.host !== false });
+  mountAssets(app, hh.static, root, { host: assets?.host !== false, base: hh.cfg.basePath });
 
   app.get('/api/status', (_req, res) => res.json(status(hh)));
 

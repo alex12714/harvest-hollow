@@ -3,7 +3,8 @@
 //
 //   HH_TELEMETRY=off            nothing is ever queued or sent, whatever a farmer chose (the operator's kill switch)
 //   HH_TELEMETRY_URL=<url>      where shared events go (default the public host's /api/telemetry); 'off' = never send
-//   HH_TELEMETRY_RECEIVE=1      mount the receiver in single mode too (multi mode always mounts it)
+//   HH_TELEMETRY_RECEIVE=1|on   mount the receiver in single mode too (multi mode mounts it by default)
+//   HH_TELEMETRY_RECEIVE=0|off  never mount it, in either mode (POST /api/telemetry answers 404)
 //   HH_TELEMETRY_PER_DAY=<n>    the receiver's global daily cap (default 5000)
 import { ConfigError } from '../config.js';
 
@@ -41,11 +42,16 @@ export function telemetryConfig(env = process.env) {
     if (!Number.isSafeInteger(n) || n < 1) throw new ConfigError(`HH_TELEMETRY_PER_DAY=${env.HH_TELEMETRY_PER_DAY} must be an integer >= 1`);
     perDay = n;
   }
+  const rawReceive = env.HH_TELEMETRY_RECEIVE;
+  let receive = null;                              // null: the mode decides (multi on, single off)
+  if (rawReceive === '1' || rawReceive === 'on') receive = true;
+  else if (rawReceive === '0' || rawReceive === 'off') receive = false;
+  else if (rawReceive !== undefined && rawReceive !== '') throw new ConfigError(`HH_TELEMETRY_RECEIVE=${rawReceive} must be on or off`);
   return {
     enabled: !off,                                   // false: record() is a no-op for everyone
     url,                                             // null: nothing is sent over HTTP (a local receiver still stores)
     urlExplicit: raw !== undefined && raw !== '',    // an operator-chosen address always gets the HTTP delivery
-    receive: env.HH_TELEMETRY_RECEIVE === '1',
+    receive,                                         // true | false | null (the mode's default)
     perDay,
   };
 }

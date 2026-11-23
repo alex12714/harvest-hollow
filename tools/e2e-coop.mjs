@@ -49,12 +49,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
+import { basePathOf } from '../server/base-path.js';
 import { createFarm, validateState } from '../shared/rules/state.js';
 import { runAction, makeCtx, ACTIONS } from '../shared/rules/index.js';
 import { cropOf, defOf, xpForLevel, SAFETY, COOP, CONTENT, MILESTONE, isLive, itemOf, COLLECTION_RULES, DUEL, BREEDING, INTERIOR,
   FISHING, FAIR, featureOf, furnitureOf } from '../shared/content/index.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+// HH_BASE_PATH in the environment (the spawned server inherits it): the pages and the status under that prefix
+const BASE = basePathOf(process.env.HH_BASE_PATH);
 const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) => {
   if (a.startsWith('--')) acc.push([a.slice(2), all[i + 1] && !all[i + 1].startsWith('--') ? all[i + 1] : true]);
   return acc;
@@ -186,7 +189,7 @@ const st = (page) => page.evaluate(() => JSON.parse(JSON.stringify(window.__hh.s
 const LOAD_SLOW = (() => { const per = os.loadavg()[0] / Math.max(1, os.cpus().length); return per > 3 ? 3 : per > 1.5 ? 2 : 1; })();
 const SLOW = Math.max(1, Number(args.slow || process.env.HH_E2E_SLOW || LOAD_SLOW));
 const waitFor = (page, fn, arg, timeout = 10_000) => page.waitForFunction(fn, { timeout: timeout * SLOW, polling: 20 }, arg);
-const serverStatus = async () => (await fetch(`http://127.0.0.1:${port}/api/status`)).json();
+const serverStatus = async () => (await fetch(`http://127.0.0.1:${port}${BASE}/api/status`)).json();
 const inv = (s, item) => (s.farm.inventory[item] ?? 0) + (s.farm.overflow?.[item] ?? 0);
 
 /**
@@ -972,7 +975,7 @@ try {
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hook); else hook();
     });
     // low tier: two WebGL pages share one CPU under SwiftShader (headless has no GPU); the rules do not care
-    await page.goto(`http://${host}:${port}/?slot=${slot}&name=${name}&quality=low`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`http://${host}:${port}${BASE}/?slot=${slot}&name=${name}&quality=low`, { waitUntil: 'domcontentloaded' });
     await waitFor(page, () => window.__hh && window.__hh.pid && window.__hh.state && window.__hh.controller, null, 40000);
     return page;
   };

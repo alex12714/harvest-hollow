@@ -41,11 +41,12 @@ import { WebSocketServer } from 'ws';
 import { createLogger } from './log.js';
 import { Perf } from './perf.js';
 import { StaticFiles } from './static.js';
-import { mountAssets, devRouter, isLoopback, WS_DEFLATE } from './http.js';
+import { mountAssets, devRouter, isLoopback, WS_DEFLATE, frameAncestors } from './http.js';
+import { withBasePath, wsPath } from './base-path.js';
 import { FarmRegistry, ID_RE, redactArg, redactLog } from './farms.js';
 import { WindowLimiter, Counter, clientIp, maskIp } from './ip-limits.js';
 import { multiConfig } from './config.js';
-import { mountIdeas } from './ideas.js';
+import { mountIdeas, ideasConfig } from './ideas.js';
 import { StarCount } from './stars.js';
 import { isTimeZone } from '../shared/rules/calendar.js';
 import { LIMITS, PROTOCOL_VERSION } from '../shared/net/protocol.js';
@@ -79,14 +80,14 @@ function sameOrigin(req, res, next) {
   return next();
 }
 
-/** A tiny fallback front door when public/landing.html is missing (the real one is the client's). */
-const FALLBACK_LANDING = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+/** A tiny fallback front door when public/landing.html is missing (the real one is the client's), under `base`. */
+const fallbackLanding = (base = '') => `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Harness Hollow</title></head>
 <body style="font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem">
 <h1>Harness Hollow</h1><button id="go" type="button">Start a new farm</button><p id="st" role="status"></p>
 <p>Farms nobody visits for 7 days are deleted.</p>
-<script>document.getElementById('go').onclick=async()=>{const r=await fetch('/api/farms',{method:'POST'});
-const b=await r.json().catch(()=>({}));if(r.ok){location.href='/f/'+b.id+'#k='+b.secret}else{
+<script>document.getElementById('go').onclick=async()=>{const r=await fetch(${JSON.stringify(`${base}/api/farms`)},{method:'POST'});
+const b=await r.json().catch(()=>({}));if(r.ok){location.href=${JSON.stringify(`${base}/f/`)}+b.id+'#k='+b.secret}else{
 document.getElementById('st').textContent=r.status===429?'Too many new farms from here; try later.':'We are full right now.'}}</script>
 </body></html>`;
 
@@ -115,6 +116,7 @@ export function multiStatus(hh) {
 /** The express app of the multi-farm host. */
 export function createMultiApp(hh) {
   const { cfg, mc, reg, log } = hh;
+  const base = cfg.basePath || '';                // HH_BASE_PATH (server/base-path.js): routes stay as they are
   const app = express();
   app.disable('x-powered-by');
   app.disable('etag');                            // API answers are no-store; pages carry their own ETag
@@ -124,6 +126,7 @@ export function createMultiApp(hh) {
     res.setHeader('Referrer-Policy', 'same-origin');
     next();
   });
+  if (cfg.frameAncestors) app.use(frameAncestors(cfg.frameAncestors));
   const ipOf = (req) => clientIp(req, mc.trustProxy);
   const create = new WindowLimiter([[60 * 60_000, mc.createPerHour], [24 * 60 * 60_000, mc.createPerDay]]);
   const invites = new WindowLimiter([[60 * 60_000, 30]]);
@@ -148,9 +151,9 @@ export function createMultiApp(hh) {
     try { page = hh.static.indexHtml('landing.html'); } catch (err) { log.error('landing.html could not be rendered', err); }
     if (page) return hh.static.sendPage(req, res, page);
     res.setHeader('Cache-Control', 'no-cache');
-    return res.type('html').send(FALLBACK_LANDING);
+    return res.type('html').send(fallbackLanding(base));
   });
-  app.get('/index.html', (_req, res) => res.redirect(302, '/'));
+  app.get('/index.html', (req, res) => res.redirect(302, `${req.baseUrl}/`));
   // the privacy note (public/privacy.html: English and Bulgarian, the privacy request form): multi mode only, since a
   // self-hosted server keeps its data itself (the repo's PRIVACY.md says so)
   app.get(['/privacy', '/privacy/'], (req, res, next) => {
@@ -175,6 +178,12 @@ export function createMultiApp(hh) {
     }
     const tag = (file === 'manifest.bg.webmanifest' ? FRONT_BG : FRONT_EN)['front.hero.tag'];
     m = { ...m, ...(typeof tag === 'string' && tag ? { description: tag } : {}) };
+    // under HH_BASE_PATH the landing's own id, start and scope and the icons live under the prefix too
+    if (base) {
+      const under = (u) => (typeof u === 'string' && u.startsWith('/') && !u.startsWith('//') ? `${base}${u}` : u);
+      m = { ...m, id: under(m.id), start_url: under(m.start_url), scope: under(m.scope),
+        ...(Array.isArray(m.icons) ? { icons: m.icons.map((i) => ({ ...i, src: under(i.src) })) } : {}) };
+    }
     baseManifests.set(file, m);
     return m;
   };
@@ -182,10 +191,10 @@ export function createMultiApp(hh) {
     if (!ID_RE.test(req.params.id)) return res.status(404).type('text').send('Not found');
     const baseManifest = hostManifest(req.query.lang === 'bg' ? 'manifest.bg.webmanifest' : 'manifest.webmanifest');
     if (!baseManifest) return res.status(404).type('text').send('Not found');
-    const at = `/f/${req.params.id}`;
+    const at = `${base}/f/${req.params.id}`;
     res.set('Cache-Control', 'public, max-age=3600');
     res.set('X-Robots-Tag', 'noindex');
-    return res.type('application/manifest+json').send(JSON.stringify({ ...baseManifest, id: at, start_url: at, scope: '/' }));
+    return res.type('application/manifest+json').send(JSON.stringify({ ...baseManifest, id: at, start_url: at, scope: `${base}/` }));
   });
   // the landing page's own (public/landing.html links /manifest.webmanifest): the same description, its own start
   app.get(['/manifest.webmanifest', '/manifest.bg.webmanifest'], (req, res, next) => {
@@ -195,7 +204,7 @@ export function createMultiApp(hh) {
     res.set('Cache-Control', 'no-cache');
     return res.type('application/manifest+json').send(JSON.stringify(m));
   });
-  mountAssets(app, hh.static, cfg.root, { host: cfg.assets?.host !== false });   // /b/<build>/: this host serves option 2's files
+  mountAssets(app, hh.static, cfg.root, { host: cfg.assets?.host !== false, base });   // /b/<build>/: this host serves option 2's files
 
   app.get('/api/status', (_req, res) => res.set('Cache-Control', NO_STORE).json(multiStatus(hh)));
 
@@ -392,7 +401,8 @@ export async function startMultiServer(cfg) {
   // every host line is redacted too: an uncaught error's stack or a library message may carry a farm's path
   const log = redactLog(cfg.log || createLogger({ quiet: cfg.quiet, json: cfg.logJson }));
   const perf = new Perf();
-  const staticFiles = new StaticFiles({ root: cfg.root, log });
+  const ideasOn = { ...ideasConfig(process.env), ...(cfg.ideas || {}) }.enabled !== false;
+  const staticFiles = new StaticFiles({ root: cfg.root, log, basePath: cfg.basePath, pageMeta: ideasOn ? {} : { ideas: 'off' } });
   const reg = new FarmRegistry({ cfg, mc, log, perf, staticFiles });
   const stored = reg.scan();
   const hh = { cfg, mc, log, reg, perf, static: staticFiles, startedAt: Date.now() };
@@ -402,8 +412,8 @@ export async function startMultiServer(cfg) {
   const { createMultiHarness } = await import('./harness/index.js');
   hh.harness = await createMultiHarness(hh);
   const app = createMultiApp(hh);
-  const server = http.createServer(app);
-  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: LIMITS.MAX_PAYLOAD, perMessageDeflate: WS_DEFLATE,
+  const server = http.createServer(withBasePath(app, cfg.basePath));
+  const wss = new WebSocketServer({ server, path: wsPath(cfg.basePath), maxPayload: LIMITS.MAX_PAYLOAD, perMessageDeflate: WS_DEFLATE,
     verifyClient: (info, cb) => {
       const { req } = info;
       const origin = req.headers.origin;
@@ -471,7 +481,7 @@ export async function startMultiServer(cfg) {
   };
   const text = [
     'Harness Hollow — multi-farm host',
-    `  running at http://localhost:${port}`,
+    `  running at http://localhost:${port}${cfg.basePath || ''}/`,
     `  data: ${cfg.dataDir} (${stored} farm(s) stored, up to ${mc.maxFarms}; deleted after ${mc.ttlDays} days without a visit)`,
     cfg.dev ? '  DEV routes are ON (loopback only)' : null,
   ].filter(Boolean).join('\n');

@@ -8,6 +8,7 @@ import { isTimeZone } from '../shared/rules/calendar.js';
 import { STARS_URL } from './stars.js';
 import { agentConfig } from './agent/config.js';
 import { telemetryConfig } from './telemetry/config.js';
+import { basePathOf } from './base-path.js';
 
 export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -51,6 +52,10 @@ export function loadConfig(env = process.env) {
   if (mode === 'multi' && env.HH_DEV === '1' && env.NODE_ENV === 'production') {
     throw new ConfigError('HH_DEV=1 is refused in multi-farm mode with NODE_ENV=production (dev routes on a public host)');
   }
+  let basePath;
+  try { basePath = basePathOf(env.HH_BASE_PATH); } catch (err) { throw new ConfigError(err.message); }
+  const assets = assetConfig(env);
+  if (basePath && assets.origin) throw new ConfigError('HH_BASE_PATH and HH_ASSET_ORIGIN cannot be used together yet');
   return {
     mode,                                 // 'single' (default: one farm, the LAN game) or 'multi' (hosted, server/multi.js)
     multi: mode === 'multi' ? multiConfig(env) : null,   // the hosting knobs (multiConfig), multi mode only
@@ -76,8 +81,25 @@ export function loadConfig(env = process.env) {
     version: packageVersion(),
     harness: harnessConfig(env),          // the in-game helper (Harness Hollow): every HH_HARNESS* / HH_MOD* knob
     telemetry: telemetryConfig(env),      // the helper's opt-in sharing (server/telemetry)
-    assets: assetConfig(env),             // option 2: the game files from the public host (server/asset-origin.js)
+    assets,                               // option 2: the game files from the public host (server/asset-origin.js)
+    basePath,                             // HH_BASE_PATH: '' or '/seg[/seg]': everything under that prefix (server/base-path.js)
+    frameAncestors: frameAncestorsOf(env.HH_FRAME_ANCESTORS),   // HH_FRAME_ANCESTORS: who may frame the pages (null: no header)
   };
+}
+
+/**
+ * HH_FRAME_ANCESTORS: the sources of a CSP `frame-ancestors` directive, space separated ('self', 'none', https origins,
+ * `https://*.example.com`, a scheme like `https:`); unquoted self / none are quoted for you. Unset or '' -> null (no
+ * header: any site may frame the game, the default).
+ */
+export function frameAncestorsOf(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return null;
+  const SOURCE = /^(?:'self'|'none'|[a-z][a-z0-9+.-]*:|(?:https?:\/\/)?(?:\*\.)?[A-Za-z0-9.-]+(?::(?:\d{1,5}|\*))?(?:\/[A-Za-z0-9._~\/-]*)?)$/;
+  const parts = String(raw).trim().split(/\s+/).map((x) => (x === 'self' || x === 'none' ? `'${x}'` : x));
+  const bad = parts.find((x) => !SOURCE.test(x));
+  if (bad) throw new ConfigError(`HH_FRAME_ANCESTORS: ${bad} is not a frame-ancestors source ('self', 'none', https://host, https://*.host)`);
+  if (parts.includes("'none'") && parts.length > 1) throw new ConfigError("HH_FRAME_ANCESTORS: 'none' must stand alone");
+  return parts.join(' ');
 }
 
 const LOOPBACK_NAME = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\])$/i;

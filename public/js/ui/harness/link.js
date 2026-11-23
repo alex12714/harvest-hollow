@@ -12,13 +12,16 @@
 //                                          mode the member secret (net/farm.js session), single mode the slot's token
 
 import { lazyImport } from '../../net/lazy.js';
+import { assetUrl } from '../../net/asset-base.js';
+import { url as baseUrl } from '../../net/base.js';
 
 /** Does the page's import map name this module (server-versioned, so it exists)? */
 export function inImportMap(url, doc = globalThis.document) {
   try {
     const el = doc?.querySelector?.('script[type="importmap"]');
     const map = el ? JSON.parse(el.textContent || '{}') : null;
-    return Boolean(map && map.imports && Object.hasOwn(map.imports, url));
+    // under a path prefix the map is keyed by the URLs there (server/static.js): /js/... under <base>/public
+    return Boolean(map && map.imports && [url, assetUrl(url), baseUrl(url)].some((k) => Object.hasOwn(map.imports, k)));
   } catch {
     return false;
   }

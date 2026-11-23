@@ -69,7 +69,8 @@ export function createTelemetry(ctx) {
   const hostDir = ctx.hostDir;
   let receiver = null;
   const sender = new TelemetrySender({
-    hostDir, url: tc.url, log, wall, fetcher: ctx.fetcher ?? globalThis.fetch,
+    // HH_TELEMETRY=off: no address at all, so not even an outbox left from before the switch leaves this server
+    hostDir, url: tc.enabled ? tc.url : null, log, wall, fetcher: ctx.fetcher ?? globalThis.fetch,
     // the official multi host stores its own farms' events directly, unless the operator named another address
     local: () => (receiver && !tc.urlExplicit ? receiver.ingest : null),
   }).load();
@@ -148,7 +149,7 @@ export function createTelemetry(ctx) {
   }
 
   function receiverRoutes(app, { reg = ctx.reg ?? null, limiters = ctx.limiters ?? null } = {}) {
-    if (receiver || !(mode === 'multi' || tc.receive)) return receiver;
+    if (receiver || !(tc.receive ?? mode === 'multi')) return receiver;
     const ic = { ...ideasConfig(process.env), ...(cfg.ideas || {}) };
     receiver = mountTelemetryReceiver(app, {
       dataDir: cfg.dataDir, log, wall, perDay: tc.perDay, adminToken: ic.adminToken,

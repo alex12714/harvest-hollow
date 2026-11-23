@@ -19,6 +19,7 @@
 //                                    storage between Chrome and its home-screen apps and makes an installed app only
 //                                    from an http(s) manifest: there the link is the keyless /f/<id>/manifest.webmanifest.
 import { assetUrl } from '../net/asset-base.js';
+import { url } from '../net/base.js';
 import { h, ensureStylesheet } from './dom.js';
 import { langToggle } from './lang-toggle.js';
 import { createFarmScope, farmsOnDevice, personalLink, parseFarmLink, farmLinkPath, isAndroid, TTL_DAYS } from '../net/farm.js';
@@ -103,7 +104,7 @@ export function showFarmGate(kind, { farmId = null, doc = globalThis.document, l
   const others = mine.length
     ? h('div.gate-farms',
       h('h3', t('multi.farmsHere')),
-      h('ul', mine.slice(0, 4).map((f) => h('li', h('a.gate-farm', { href: `/f/${encodeURIComponent(f.id)}` }, describedLink(f))))))
+      h('ul', mine.slice(0, 4).map((f) => h('li', h('a.gate-farm', { href: url(`/f/${encodeURIComponent(f.id)}`) }, describedLink(f))))))
     : null;
 
   const el = h('section.modal-layer.farm-gate#farm-gate', { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'farm-gate-title',
@@ -115,14 +116,14 @@ export function showFarmGate(kind, { farmId = null, doc = globalThis.document, l
       h('p.gate-lead#farm-gate-lead', text.lead),
       text.note ? h('p.gate-note', text.note) : null,
       LOST.has(kind) ? back : null,
-      h('div.gate-actions', h('a.btn', { href: '/' }, kind === 'gone' || kind === 'deleted' ? t('multi.start') : t('multi.gate.startOwn'))),
+      h('div.gate-actions', h('a.btn', { href: url('/') }, kind === 'gone' || kind === 'deleted' ? t('multi.start') : t('multi.gate.startOwn'))),
       others,
       // a deleted farm has no way back in: no "I have my personal farm link" there
       LOST.has(kind) || kind === 'deleted' ? null : h('details.gate-key',
         h('summary', t('multi.gate.haveLink')),
         h('p.gate-help', t('multi.gate.pasteHelp')),
         back),
-      h('p.gate-privacy', h('a', { href: PRIVACY_PATH, target: '_blank', rel: 'noopener' }, t('privacy.gate.link'))))));
+      h('p.gate-privacy', h('a', { href: url(PRIVACY_PATH), target: '_blank', rel: 'noopener' }, t('privacy.gate.link'))))));
   doc.body.append(el);
   // the painting behind, the same as the slot picker's
   setTimeout(() => el.classList.add('painted'), 0);
@@ -141,17 +142,17 @@ export async function installFarmManifest(id, secret, { doc = globalThis.documen
     if (!link || !origin || !createFarmScope(id).multi) return null;
     if (!link.dataset.base) link.dataset.base = link.getAttribute('href');
     if (isAndroid(nav)) {
-      const href = farmManifestHref(`/f/${encodeURIComponent(id)}/manifest.webmanifest`, lang());
+      const href = farmManifestHref(url(`/f/${encodeURIComponent(id)}/manifest.webmanifest`), lang());
       link.setAttribute('href', href);
-      return { id: `/f/${id}`, start_url: `/f/${id}`, href };
+      return { id: url(`/f/${id}`), start_url: url(`/f/${id}`), href };
     }
     const res = await fetcher(link.dataset.base, { cache: 'force-cache' });
     if (!res.ok) return null;
     const base = await res.json();
     if (!base || typeof base !== 'object' || !base.name) return null;
-    const start = secret ? personalLink(origin, id, secret) : `${origin}/f/${encodeURIComponent(id)}`;
+    const start = secret ? personalLink(origin, id, secret) : `${origin}${url(`/f/${encodeURIComponent(id)}`)}`;
     const icons = (base.icons || []).map((i) => ({ ...i, src: new URL(i.src, origin).href }));
-    const m = { ...base, id: `/f/${id}`, start_url: start, scope: `${origin}/`, icons };
+    const m = { ...base, id: url(`/f/${id}`), start_url: start, scope: new URL(url('/'), origin).href, icons };
     const href = `data:application/manifest+json,${encodeURIComponent(JSON.stringify(m))}`;
     link.setAttribute('href', href);
     return m;

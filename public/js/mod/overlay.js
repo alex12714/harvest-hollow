@@ -13,11 +13,12 @@ import { setIconOverlay } from '../render/icons.js';
 import { setNameOverlay } from '../i18n/names.js';
 import { applyLook } from './look.js';
 import { emitHarness } from '../harness/bus.js';
+import { url, pagePath } from '../net/base.js';
 
 /** '' in single mode, '/f/<id>' on a hosted farm (the icon routes live under the farm's path). */
 export function assetBaseOf(loc = typeof location !== 'undefined' ? location : null) {
-  const m = loc && /^\/f\/([a-z2-7]{12})(?:\/|$)/.exec(loc.pathname);
-  return m ? `/f/${m[1]}` : '';
+  const m = loc && /^\/f\/([a-z2-7]{12})(?:\/|$)/.exec(pagePath(loc.pathname));
+  return m ? url(`/f/${m[1]}`) : '';
 }
 
 export function iconUrls(overlay, assetBase = '') {

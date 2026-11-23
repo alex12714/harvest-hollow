@@ -7,7 +7,9 @@
 // they stay on the page's own origin.
 //
 //   ASSET_BASE                      '<host>/b/<build>/public' or ''
-//   assetUrl('/assets/x.png')       ASSET_BASE + '/assets/x.png' (only a root path moves)
+//   assetUrl('/assets/x.png')       ASSET_BASE + '/assets/x.png' (only a root path moves); on a page under a path
+//                                   prefix (net/base.js BASE) and no host: BASE + '/public/assets/x.png', the server's
+//                                   same-origin copy of option 2's layout (server/base-path.js)
 //   assetPath(url)                  the inverse: the base stripped off a URL assetUrl() built
 //   assetIntegrity('/css/x.css')    the stylesheet's integrity value on a host page ('' elsewhere): ensureStylesheet()
 //                                   links a host stylesheet with it and crossOrigin 'anonymous'
@@ -17,6 +19,8 @@
 //   noteHostFailure(why)            the host failed us after the boot: once per page, 'hh:assets-failed' on window
 //                                   (main.js offers "Reload" there; a failed lazy import() cannot be retried in place)
 
+import { BASE } from './base.js';
+
 /** The meta's content without a trailing slash, or '' (no meta, or no document at all: node tests, a worker). */
 function readBase() {
   const raw = globalThis.document?.querySelector?.('meta[name="hh-assets"]')?.getAttribute('content') ?? '';
@@ -25,20 +29,22 @@ function readBase() {
 
 /** This page's asset base, read once when the module loads: the server renders it into the page it serves. */
 export const ASSET_BASE = readBase();
+/** Where assetUrl() puts a root path: the host's base, else this page's own prefix (net/base.js), else nothing. */
+const FILES_BASE = ASSET_BASE || (BASE ? `${BASE}/public` : '');
 
 /**
  * '/assets/x.png' -> ASSET_BASE + '/assets/x.png'. Only a root path moves: '//host/x', 'https://…', 'data:…', a
  * relative path or a non-string comes back unchanged.
  */
 export function assetUrl(path) {
-  if (!ASSET_BASE || typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) return path;
-  return `${ASSET_BASE}${path}`;
+  if (!FILES_BASE || typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) return path;
+  return `${FILES_BASE}${path}`;
 }
 
 /** The inverse of assetUrl(): the base stripped off a URL it built; any other URL comes back unchanged. */
 export function assetPath(url) {
-  if (!ASSET_BASE || typeof url !== 'string' || !url.startsWith(ASSET_BASE)) return url;
-  const rest = url.slice(ASSET_BASE.length);
+  if (!FILES_BASE || typeof url !== 'string' || !url.startsWith(FILES_BASE)) return url;
+  const rest = url.slice(FILES_BASE.length);
   return rest.startsWith('/') ? rest : url;
 }
 

@@ -11,6 +11,7 @@
 //   checkRequest({ kind, text, contact }) -> { ok } | { ok: false, field, code }   pure
 //   sendRequest(fetch, fields) -> { ok, id } | { ok: false, code: 'RATE'|'FULL'|'BAD'|'NET', field? }   never throws
 import { t, setLang } from './i18n/privacy.js';
+import { url } from './net/base.js';
 
 export const LANGS = Object.freeze(['en', 'bg']);
 /** The device's language choice (i18n/core.js STORAGE_KEY): one choice for every page of the site. */
@@ -52,7 +53,7 @@ export async function sendRequest(fetcher, { kind, text, contact = '', lang = nu
   if (website) body.website = website;
   let res;
   try {
-    res = await fetcher('/api/privacy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
+    res = await fetcher(url('/api/privacy'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
   } catch { return { ok: false, code: 'NET' }; }
   let json = null;
   try { json = await res.json(); } catch { json = null; }

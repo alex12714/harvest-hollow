@@ -16,6 +16,7 @@
 // A farm with two farmers: the card also offers a new key for a farmer who lost theirs (ui/keep.js fullRows), so a
 // lost phone never leaves the farm "full" for good.
 import { h, kv, svgIcon, ensureStylesheet } from './dom.js';
+import { url as baseUrl } from '../net/base.js';
 import { farm, session, createInvite, inviteLink, personalLink, TTL_DAYS } from '../net/farm.js';
 import { BRAND } from '../../../shared/brand.js';
 import { t, tn, getters, lang } from '../i18n/index.js';
@@ -188,7 +189,7 @@ export function createInviteUi(S) {
       // "Keep your farm safe" (ui/keep.js)
       ...(S.keep ? S.keep.keepRows(ctx) : []),
       h('div.set-row', h('span.lbl', t('multi.set.keeping')), h('span.help.set-retention', retentionText(session.ttlDays))),
-      h('div.set-row', h('span.lbl', t('multi.set.farms')), h('div', h('a.btn.btn--paper.btn--small', { href: '/?home=1' }, t('multi.set.allFarms'))),
+      h('div.set-row', h('span.lbl', t('multi.set.farms')), h('div', h('a.btn.btn--paper.btn--small', { href: baseUrl('/?home=1') }, t('multi.set.allFarms'))),
         h('span.help', t('multi.set.farmsHelp'))),
       // the Farmers: when each was last here, and a new key for one who lost theirs (ui/keep.js)
       ...(S.keep ? S.keep.farmerRows(ctx) : []),

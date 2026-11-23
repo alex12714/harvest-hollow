@@ -26,6 +26,7 @@ import { createFarm, validateState, DEFAULT_TZ } from '../shared/rules/state.js'
 import { spawnAt } from '../shared/rules/grid.js';
 import { CONTENT_HASH } from '../shared/content/index.js';
 import { LIMITS, CLOSE, parseClientMessage } from '../shared/net/protocol.js';
+import { withBasePath, wsPath } from './base-path.js';
 
 /** Exit status for "the data needs a human" (sysexits EX_CONFIG): the systemd unit does not restart on it. */
 export const EXIT_REFUSED = 78;
@@ -182,7 +183,7 @@ export async function openFarm(cfg, { log, dir = cfg.dataDir, perf = null, stati
   engine.incident = (name, data) => persist.incident(name, data);
   persist.openJournal();
   const hh = { cfg, log, persist, engine, clock, parse: parseClientMessage, startedAt: Date.now(), perf: perf ?? new Perf() };
-  hh.static = staticFiles ?? new StaticFiles({ root: cfg.root, log });   // BUILD_HASH: the game files this server serves
+  hh.static = staticFiles ?? new StaticFiles({ root: cfg.root, log, basePath: cfg.basePath });   // BUILD_HASH: the game files this server serves
   // a farmer appears on the farmhouse porch wherever the couple moved the farmhouse (owner rule 2026-10-04)
   hh.presence = new Presence(clock, (msg) => hh.sessions.presenceOut(msg), { spawnOf: (pid) => spawnAt(engine.state, pid) });
   // Together time not paid before the last snapshot, minus what the replayed lines paid since (SV-07).
@@ -253,8 +254,8 @@ export async function startServer(cfg = loadConfig()) {
   const { createSingleHarness } = await import('./harness/index.js');
   hh.harness = await createSingleHarness(hh);
   const app = createApp(hh);
-  const server = http.createServer(app);
-  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: LIMITS.MAX_PAYLOAD, perMessageDeflate: WS_DEFLATE,
+  const server = http.createServer(withBasePath(app, cfg.basePath));
+  const wss = new WebSocketServer({ server, path: wsPath(cfg.basePath), maxPayload: LIMITS.MAX_PAYLOAD, perMessageDeflate: WS_DEFLATE,
     // Same-origin only: a page from another origin must not drive the farm (tech §7 rule 8).
     verifyClient: ({ req }) => {
       const origin = req.headers.origin;

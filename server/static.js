@@ -54,6 +54,13 @@
 //   - the SELF variant with `probe` loads /sri-probe once per browser: a page whose import map gives a probe module a
 //     deliberately wrong hash; a browser that refuses it (and runs the correct one) gets the hh_sri cookie, and only
 //     such a browser is ever sent the host variant (the support rule, critique#25).
+//
+// HH_BASE_PATH (server/base-path.js; `basePath` here, '' = none): the self variant with every local URL under the
+// prefix. Modules, stylesheets and assets move to <prefix>/public/..., shared/ and vendor/three to <prefix>/shared/...
+// and <prefix>/vendor/three/... (the '..' clamping, as for option 2's host layout), with the same ?v= versions; the
+// import map is keyed by those URLs, so every relative import still lands on its versioned URL. Every other local
+// href/src/srcset/action (links, the manifest, icons, forms) gets the prefix, and the page carries
+// <meta name="hh-base" content="<prefix>"> for the client (public/js/net/base.js).
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -230,10 +237,16 @@ const PROBE_LOADER = "(function(){try{if(/(?:^|;\\s*)hh_sri=1/.test(document.coo
   + "setTimeout(function(){f.remove()},20000)},4000)})})();";
 
 export class StaticFiles {
-  /** @param {{ root: string, log?: Console }} o */
-  constructor({ root, log = console }) {
+  /**
+   * @param {{ root: string, log?: Console, basePath?: string, pageMeta?: Record<string, string> }} o  `pageMeta`: extra
+   *   <meta name="hh-<key>" content="<value>"> on every rendered page (switches the client reads, e.g. { ideas: 'off' })
+   */
+  constructor({ root, log = console, basePath = '', pageMeta = {} }) {
     this.root = root;
     this.log = log;
+    /** HH_BASE_PATH: '' or '/seg[/seg]' (see the header) */
+    this.basePath = basePath || '';
+    this.pageMeta = Object.entries(pageMeta || {}).filter(([k, v]) => /^[a-z][a-z0-9-]*$/.test(k) && /^[\w .:/-]*$/.test(String(v)));
     this.build = buildHash(root);
     /** abs -> { size, mtimeMs, mtime, hash, gz?: Promise<Buffer|null>, gzLen } */
     this.files = new Map();
@@ -559,6 +572,11 @@ try { if (parent !== window) parent.postMessage({ hhSri: yes }, location.origin)
     // the host variant's URL of a root path: the repo's layout under the build prefix (see the header)
     const toAsset = (u) => (u.startsWith('/shared/') || u.startsWith('/vendor/three/') ? `${base}${u}` : `${base}/public${u}`);
     const local = (u) => u.startsWith('/') && !u.startsWith('//');
+    // HH_BASE_PATH (self variant only; config refuses it together with option 2): a static file's URL under the prefix
+    // (the same layout as the host's), and any other local URL with the prefix in front
+    const pre = base ? '' : this.basePath;
+    const underBase = (u) => (!pre || !local(u) || u === pre || u.startsWith(`${pre}/`) ? u
+      : /^\/(js|css|assets)\//.test(u) ? `${pre}/public${u}` : `${pre}${u}`);
     // the page's own import map (the ui lane's), merged
     const mapRe = /<script\b[^>]*\btype=["']importmap["'][^>]*>([\s\S]*?)<\/script>/i;
     const mm = mapRe.exec(html);
@@ -588,14 +606,17 @@ try { if (parent !== window) parent.postMessage({ hhSri: yes }, location.origin)
         for (const [url, a] of g.all) {
           const e = dep(a);
           if (!e) continue;
-          imports[url] = base ? toAsset(url) : `${url}?v=${e.hash}`;
-          if (base) sri.set(imports[url], e.sri);
+          // under a prefix the key is the URL the browser resolves there (a relative import lands on it)
+          const k = pre ? underBase(url) : url;
+          imports[k] = base ? toAsset(url) : `${underBase(url)}?v=${e.hash}`;
+          if (base) sri.set(imports[k], e.sri);
         }
-        for (const [spec, url] of g.bare) if (imports[url]) imports[spec] = imports[url];
-        for (const url of g.statics) if (url !== entry && imports[url]) statics.add(imports[url]);
+        for (const [spec, url] of g.bare) { const k = pre ? underBase(url) : url; if (imports[k]) imports[spec] = imports[k]; }
+        for (const url of g.statics) { const k = pre ? underBase(url) : url; if (url !== entry && imports[k]) statics.add(imports[k]); }
       }
       // the page's own entries (bare specifiers, prefixes like three/addons/) follow the files to the host
       if (base) for (const k of Object.keys(imports)) if (local(imports[k]) && !imports[k].startsWith(base)) imports[k] = toAsset(imports[k]);
+      if (pre) for (const k of Object.keys(imports)) imports[k] = underBase(imports[k]);
       const out = { ...map, imports };
       if (base) out.integrity = { ...(map.integrity || {}), ...Object.fromEntries(sri) };
       const json = JSON.stringify(out, null, base ? 0 : 1);
@@ -622,7 +643,7 @@ try { if (parent !== window) parent.postMessage({ hhSri: yes }, location.origin)
         const f = fileOf(this.root, url);
         const e = f && dep(f.abs);
         if (!e) return all;
-        if (!base || (rel && rel !== 'stylesheet')) return `${attr}=${q}${url}?v=${e.hash}${q}`;
+        if (!base || (rel && rel !== 'stylesheet')) return `${attr}=${q}${underBase(url)}?v=${e.hash}${q}`;
         const at = toAsset(url);
         if (/^script$/i.test(el)) return `${attr}=${q}${at}${q} integrity="${e.sri}"`;
         if (rel === 'stylesheet') return `${attr}=${q}${at}${q} integrity="${e.sri}" crossorigin="anonymous"`;
@@ -637,9 +658,19 @@ try { if (parent !== window) parent.postMessage({ hhSri: yes }, location.origin)
       html = html.replace(/<(source|img)\b[^>]*\bsrcset=[^>]*>/gi, (tag) => tag.replace(/\bsrcset=(["'])([^"']*)\1/i, (all, q, set) =>
         `srcset=${q}${set.split(',').map((part) => part.trim().replace(/^(\/[^\s?#]*)/, (u) => (local(u) ? toAsset(u) : u))).join(', ')}${q}`));
     }
+    if (pre) {
+      // every other local URL in a tag (links, the manifest, preloads, <picture> sources, forms) under the prefix; the
+      // versioned ones above already are (underBase leaves them alone)
+      html = html.replace(/<(a|link|img|source|form|script|iframe)\b[^>]*>/gi, (tag) => tag
+        .replace(/\b(href|src|action)=(["'])(\/(?!\/)[^"']*)\2/gi, (all, attr, q, url) => `${attr}=${q}${underBase(url)}${q}`)
+        .replace(/\bsrcset=(["'])([^"']*)\1/gi, (all, q, set) =>
+          `srcset=${q}${set.split(',').map((part) => part.trim().replace(/^(\/[^\s?#]*)/, (u) => underBase(u))).join(', ')}${q}`));
+    }
     // the asset packs (SV-03): their index rides in the game page; a changed model re-renders it (deps). Another page
     // (the multi-farm landing page) loads no models: no index there (it was 5.7 KB of the front door's 10 KB gzip)
     let meta = `<meta name="hh-build" content="${this.build}">`;
+    if (pre) meta += `\n  <meta name="hh-base" content="${pre}">`;
+    for (const [k, v] of this.pageMeta) meta += `\n  <meta name="hh-${k}" content="${v}">`;
     if (base) {
       const origin = new URL(base).origin;
       meta += `\n  <meta name="hh-assets" content="${base}/public">\n  <meta name="referrer" content="same-origin">`;

@@ -71,6 +71,8 @@ const DAY = 24 * HOUR;
 export function ideasConfig(env = process.env) {
   const cap = Number(env.HH_IDEAS_PER_DAY);
   return {
+    // HH_IDEAS=off: no ideas box on this host (POST /api/ideas and its admin routes answer 404; the pages hide the entry)
+    enabled: env.HH_IDEAS !== 'off' && env.HH_IDEAS !== '0',
     adminToken: env.HH_ADMIN_TOKEN || null,
     perDay: Number.isSafeInteger(cap) && cap > 0 ? cap : 200,
   };
@@ -384,7 +386,7 @@ export function mountIdeas(app, hh, { sameOrigin = (_q, _r, next) => next() } = 
     return { ideas, requests: asked };
   });
 
-  app.post('/api/ideas', sameOrigin, express.json({ limit: '4kb' }), async (req, res) => {
+  if (ic.enabled) app.post('/api/ideas', sameOrigin, express.json({ limit: '4kb' }), async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const c = checkIdea(req.body);
     if (!c.ok) return res.status(400).json({ error: 'BAD_ARGS', field: c.field });
@@ -451,6 +453,7 @@ export function mountIdeas(app, hh, { sameOrigin = (_q, _r, next) => next() } = 
     }
     return next();
   });
+  if (!ic.enabled) adminApi.use('/ideas', (_req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
   adminApi.get('/ideas', (req, res) => {
     const status = typeof req.query.status === 'string' ? req.query.status : 'new';
     if (status !== 'all' && !STATUSES.includes(status)) return res.status(400).json({ error: 'BAD_ARGS', field: 'status' });
