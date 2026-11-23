@@ -38,6 +38,8 @@ const FILES_BASE = ASSET_BASE || (BASE ? `${BASE}/public` : '');
  */
 export function assetUrl(path) {
   if (!FILES_BASE || typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) return path;
+  // already routed (a same-origin path base is itself a root path): ensureStylesheet(assetUrl(x)) must not prefix twice
+  if (path.startsWith(`${FILES_BASE}/`)) return path;
   return `${FILES_BASE}${path}`;
 }
 

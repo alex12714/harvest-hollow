@@ -278,7 +278,7 @@ async function look(page, x, z, ms = 900) {
 }
 /** A free spot for def near (cx, cz), visible on screen, by the shared rules' canPlace. */
 const freeSpot = (page, def, cx, cz) => page.evaluate(async ([d, x0, z0]) => {
-  const g = await import('/shared/rules/grid.js');
+  const g = await import(`${(document.querySelector('meta[name="hh-base"]')?.content || '')}/shared/rules/grid.js`);
   const s = window.__hh.state;
   for (let r = 0; r < 18; r++) {
     for (let dz = -r; dz <= r; dz++) {
@@ -534,7 +534,7 @@ async function m1bFlows(A, B) {
       } else if (findBy === 'clear') {
         // A clears a weed by hand (Lost Tools: clearing debris), chopping until it is gone
         const weed = await A.evaluate(async () => {
-          const { defOf } = await import('/shared/content/index.js');
+          const { defOf } = await import(`${(document.querySelector('meta[name="hh-base"]')?.content || '')}/shared/content/index.js`);
           const s2 = window.__hh.state;
           return Object.keys(s2.farm.objects).sort().find((k) => defOf(s2.farm.objects[k].def)?.kind === 'debris' && defOf(s2.farm.objects[k].def)?.tool === 'hand')
             ?? Object.keys(s2.farm.objects).sort().find((k) => defOf(s2.farm.objects[k].def)?.kind === 'debris') ?? null;
@@ -1172,7 +1172,7 @@ try {
     const got = await waitFor(B, (n) => (window.__hh.state.farm.inventory.chicken_feed ?? 0) > n, feed0).then(() => true, () => false);
     // a failure says what the Hand saw on the mill (the tray's state, the verb, the dry run)
     const why = got ? '' : JSON.stringify(await A.evaluate(async (id) => {
-      const T = await import('/js/game/targets.js');
+      const T = await import(`${(document.querySelector('meta[name="hh-base"]')?.content || '').replace(/.+/, '$&/public')}/js/game/targets.js`);
       const h = window.__hh;
       const t = T.describe(h.state, id, h.serverNow(), h.pid);
       return { trayReady: t?.trayReady, verbs: t ? T.verbsFor('hand', t) : null, r: t ? T.resolve(h.store, 'collectTray', t, {}) : null,
@@ -1363,7 +1363,7 @@ try {
       && await waitFor(A, (id) => window.__hh.controller.tool.build?.moveId === id, barn, 4000).then(() => true, () => false));
     // a free spot for the Barn whose footprint is on screen and clear of the HUD
     const to = await A.evaluate(async ([id, x0, z0]) => {
-      const g = await import('/shared/rules/grid.js');
+      const g = await import(`${(document.querySelector('meta[name="hh-base"]')?.content || '')}/shared/rules/grid.js`);
       const h = window.__hh;
       const onWorld = (x, z) => { const p = h.view.toScreen(x, z, 0); const el = p && document.elementFromPoint(p.x, p.y); return Boolean(el && el.id === 'world'); };
       for (let r = 5; r < 16; r++) {
