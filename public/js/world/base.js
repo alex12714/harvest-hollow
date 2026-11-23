@@ -64,6 +64,17 @@ export async function valleyCall(what, { farmId, secret, worldKey = null, rejoin
   } catch { return { ok: false, status: 0, code: 'NET' }; }
 }
 
+/** A viewer's choice about a neighbour (POST /api/w/valley/hide | report with the world key): { ok, status, body }. */
+export async function valleyViewer(what, worldKey, body, fetcher = globalThis.fetch) {
+  try {
+    const r = await fetcher(url(`/api/w/valley/${what}`), {
+      method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', authorization: `Bearer ${worldKey}` },
+      body: JSON.stringify(body),
+    });
+    return { ok: r.ok, status: r.status, body: await r.json().catch(() => null) };
+  } catch { return { ok: false, status: 0, body: null }; }
+}
+
 /** A farm's map thumbnail (server/world/thumb.js): { ok, body, etag } | { ok: true, same: true } (304) | { ok: false, status }. */
 export async function fetchThumb(worldKey, farmId, etag = null, fetcher = globalThis.fetch) {
   try {

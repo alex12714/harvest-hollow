@@ -99,6 +99,28 @@ try {
     && plots.filter((p) => p.self).length === 1 && plots.find((p) => p.self).farm === ana.farmId, JSON.stringify(plots));
   check('empty plots fill the valley up to 8', (await ana.pg.$$('.hhv-plot.empty')).length === 8 - plots.length);
 
+  // 2b. Ana's "…" on Dara's card: hide it (for Ana only), show it again; report Ben's name
+  await ana.pg.click(`.hhv-plot[data-farm="${dara.farmId}"] ~ .hhv-more-wrap .hhv-more`);
+  await ana.pg.waitForSelector('.hhv-menu:not([hidden]) .hhv-menu-item');
+  await shot(ana.pg, 'valley-menu');
+  await ana.pg.click('.hhv-menu:not([hidden]) .hhv-menu-item');
+  await ana.pg.waitForFunction((id) => !document.querySelector(`.hhv-plot[data-farm="${id}"]`) && !document.querySelector('.hhv-unhide').hidden,
+    { timeout: 15_000, polling: 100 }, dara.farmId);
+  await shot(ana.pg, 'valley-hidden');
+  const daraSees = await (await fetch(`${BASE}/api/w/roster`, { headers: { authorization: `Bearer ${ents[3].worldKey}` } })).json();
+  check('hide: Dara is gone from Ana\'s map only', daraSees.members.length === 4);
+  await ana.pg.click('.hhv-unhide');
+  await ana.pg.waitForFunction((id) => document.querySelector(`.hhv-plot[data-farm="${id}"] canvas`)?.width > 4, { timeout: 30_000, polling: 100 }, dara.farmId);
+  check('show hidden farms: Dara is back', true);
+  await ana.pg.click(`.hhv-plot[data-farm="${ben.farmId}"] ~ .hhv-more-wrap .hhv-more`);
+  await ana.pg.evaluate(() => [...document.querySelectorAll('.hhv-menu:not([hidden]) .hhv-menu-item')][1].click());
+  await ana.pg.waitForSelector('.hhv-menu:not([hidden]) .hhv-menu-item.why');
+  await shot(ana.pg, 'valley-report');
+  await ana.pg.evaluate(() => document.querySelector('.hhv-menu:not([hidden]) .hhv-menu-item.why').click());
+  await ana.pg.waitForFunction(() => /Thanks/.test(document.querySelector('.hhv-menu:not([hidden])')?.textContent ?? ''), { timeout: 10_000 });
+  check('report name: thanked', true);
+  await ana.pg.keyboard.press('Escape');
+
   // 3. Ben on a phone-sized screen (a new page of his profile)
   const phone = ben.pg;
   await phone.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });

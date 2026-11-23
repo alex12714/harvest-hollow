@@ -214,7 +214,7 @@ test('valley: the roster shows strangers only names, colour and counts; a valley
     a.c.send({ t: 'chat', text: 'our secret plans' });
     await new Promise((r) => setTimeout(r, 100));
     const r = await roster(s, jb.worldKey);
-    assert.deepEqual(Object.keys(r.body).sort(), ['kind', 'max', 'me', 'members', 'title', 'wid']);
+    assert.deepEqual(Object.keys(r.body).sort(), ['hidden', 'kind', 'max', 'me', 'members', 'title', 'wid']);
     for (const m of r.body.members) {
       assert.deepEqual(Object.keys(m).sort(), ['color', 'farmId', 'farmName', 'name', 'online', 'seat', 'self', 'visiting', 'visitors']);
       assert.equal(m.visiting, null, 'no "who visits whom" among strangers');
@@ -294,4 +294,128 @@ test('farmThumb: a starter farm is grass, paths, plots and buildings; crops carr
   assert.deepEqual(g.crops, ['#E8B84A']);
   assert.equal(g.tiles[(plot.z - t.z0) * t.w + (plot.x - t.x0)], 'a');
   assert.equal(farmThumb(st, 1_070_000).tiles[(plot.z - t.z0) * t.w + (plot.x - t.x0)], 'A', 'ripe');
+});
+
+/** Everything a socket received, as one string (to look for leaked text). */
+const seen = (c) => JSON.stringify(c.msgs);
+
+async function privateTextNeverReachesVisitor(s, owner, visitorKey) {
+  const A = owner.c;
+  A.send({ t: 'act', seq: 1, type: 'noteAdd', args: { x: 24, z: 30, text: 'SECRET-NOTE-1' } });
+  A.send({ t: 'act', seq: 2, type: 'plant', args: { id: 'home.0.0', crop: 'wheat' } });
+  A.send({ t: 'chat', text: 'SECRET-CHAT-1' });
+  await new Promise((r) => setTimeout(r, 300));
+  const V = await sock(s.port, owner.id);
+  V.send({ t: 'hello', proto: PROTOCOL_VERSION, cid: 'vispriv', token: visitorKey });
+  const w = await V.next(answer);
+  assert.equal(w.t, MSG.WELCOME, JSON.stringify(w).slice(0, 200));
+  assert.ok(w.visitor);
+  const notes = Object.values(w.state.farm.notes);
+  assert.equal(notes.length, 1, 'the note itself is on the farm (a visitor sees a note is there)');
+  assert.equal(notes[0].text, '');
+  assert.deepEqual(w.state.farm.ledger.rows, {}, 'no activity log');
+  assert.deepEqual(w.chat, []);
+  // live: a second note, a planting (a ledger row), a chat line
+  A.send({ t: 'act', seq: 3, type: 'noteAdd', args: { x: 25, z: 30, text: 'SECRET-NOTE-2' } });
+  A.send({ t: 'act', seq: 4, type: 'plant', args: { id: 'home.0.1', crop: 'wheat' } });
+  A.send({ t: 'chat', text: 'SECRET-CHAT-2' });
+  const d = await V.next((m) => m.t === MSG.DELTA && m.ops.some((o) => o.p[1] === 'notes'));
+  assert.equal(d.ops.find((o) => o.p[1] === 'notes').v.text, '');
+  await V.next((m) => m.t === MSG.DELTA && m.ops.some((o) => o.p[1] === 'objects'));
+  await new Promise((r) => setTimeout(r, 300));
+  const all = seen(V);
+  for (const secret of ['SECRET-NOTE', 'SECRET-CHAT', owner.secret]) assert.ok(!all.includes(secret) && !JSON.stringify(w).includes(secret), secret);
+  assert.ok(!V.msgs.some((m) => m.t === MSG.CHAT));
+  assert.ok(!V.msgs.some((m) => m.t === MSG.DELTA && m.ops.some((o) => o.p[1] === 'ledger' && o.p[2] === 'rows')), 'no ledger rows in deltas');
+  // the farmers themselves still get it all
+  assert.ok(seen(A).includes('SECRET-NOTE-2'));
+  V.close();
+}
+
+test('privacy: a public valley visitor never receives notes, ledger, chat or keys (welcome and deltas)', async () => {
+  const s = await valleyServer();
+  try {
+    const a = await standalone(s, 'Ana', { keepOpen: true });
+    const b = await standalone(s, 'Ben');
+    await join(s, a);
+    const jb = (await join(s, b)).body;
+    await privateTextNeverReachesVisitor(s, a, jb.worldKey);
+    a.c.close();
+  } finally {
+    await s.close();
+  }
+});
+
+test('privacy: a call-world visitor never receives notes, ledger, chat or keys either', async () => {
+  const s = await valleyServer();
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const t = (n, name) => signJoinToken({ v: 1, kid: 'k1', iss: 'call.onfire.so', aud: 'harvest', wid: 'call-world-0002',
+      fid: `u:00000000-0000-0000-0000-00000000000${n}`, name, role: 'farmer', guest: false, surf: 'panel', iat: now, exp: now + 60,
+      jti: crypto.randomUUID() }, KEY);
+    const la = (await req(s.base, 'POST', '/api/w/launch', { body: { t: t(1, 'Ana') } })).body;
+    const lb = (await req(s.base, 'POST', '/api/w/launch', { body: { t: t(2, 'Ben') } })).body;
+    const c = await sock(s.port, la.farmId);
+    c.send({ t: 'hello', proto: PROTOCOL_VERSION, cid: 'anacall', token: la.key });
+    assert.equal((await c.next(answer)).t, MSG.WELCOME);
+    await privateTextNeverReachesVisitor(s, { id: la.farmId, secret: la.key, c }, lb.worldKey);
+    c.close();
+  } finally {
+    await s.close();
+  }
+});
+
+test('valley thumbnails never wake a sleeping farm (the last snapshot is read instead)', async () => {
+  const s = await valleyServer();
+  try {
+    const a = await standalone(s, 'Ana');
+    const b = await standalone(s, 'Ben');
+    const ja = (await join(s, a)).body;
+    await join(s, b);
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal((await req(s.base, 'POST', `/api/f/${b.id}/dev/unload`)).status, 200);
+    assert.equal(s.reg.rec(b.id).host, null);
+    const t = await req(s.base, 'GET', `/api/w/thumb/${b.id}`, { headers: { authorization: `Bearer ${ja.worldKey}` } });
+    assert.equal(t.status, 200, t.text);
+    assert.ok(t.body.tiles.includes('#'));
+    assert.equal(s.reg.rec(b.id).host, null, 'still asleep');
+    assert.equal((await roster(s, ja.worldKey)).status, 200);
+    assert.equal(s.reg.rec(b.id).host, null, 'the roster does not wake it either');
+  } finally {
+    await s.close();
+  }
+});
+
+test('valley: a viewer hides a neighbour (only for themselves) and reports a name (one log line, limited)', async () => {
+  const s = await valleyServer();
+  try {
+    const [a, b, c] = [await standalone(s, 'Ana'), await standalone(s, 'Ben'), await standalone(s, 'Cleo')];
+    const ja = (await join(s, a)).body;
+    const jb = (await join(s, b)).body;
+    await join(s, c);
+    const post = (k, url, body, headers = {}) => req(s.base, 'POST', url, { body, headers: { authorization: `Bearer ${k}`, ...headers } });
+    assert.equal((await post(ja.worldKey, '/api/w/valley/hide', { farmId: c.id, hide: true })).status, 200);
+    const ra = (await roster(s, ja.worldKey)).body;
+    assert.deepEqual(ra.members.map((m) => m.name), ['Ana', 'Ben'], 'hidden for Ana');
+    assert.equal(ra.hidden, 1);
+    assert.deepEqual((await roster(s, jb.worldKey)).body.members.map((m) => m.name), ['Ana', 'Ben', 'Cleo'], 'not for Ben');
+    assert.equal((await post(ja.worldKey, '/api/w/valley/hide', { farmId: a.id, hide: true })).status, 404, 'not your own farm');
+    assert.equal((await post(ja.worldKey, '/api/w/valley/hide', { hide: false })).status, 200);
+    assert.equal((await roster(s, ja.worldKey)).body.members.length, 3, 'shown again');
+    assert.equal((await post(ja.worldKey, '/api/w/valley/hide', { farmId: c.id, hide: true }, { origin: 'https://evil.example' })).status, 403);
+    assert.equal((await post('0'.repeat(64), '/api/w/valley/hide', { farmId: c.id, hide: true })).status, 401);
+    // report: 202, a bad reason 404, at most 5 an hour from one address
+    const lines = [];
+    const warn = s.hh.log.warn;
+    s.hh.log.warn = (...x) => { lines.push(x); return warn.apply(s.hh.log, x); };
+    assert.equal((await post(jb.worldKey, '/api/w/valley/report', { farmId: c.id, reason: 'offensive' })).status, 202);
+    assert.equal((await post(jb.worldKey, '/api/w/valley/report', { farmId: c.id, reason: 'offensive' })).status, 202, 'a repeat is accepted');
+    assert.equal((await post(jb.worldKey, '/api/w/valley/report', { farmId: c.id, reason: 'because' })).status, 404);
+    assert.equal(lines.filter((l) => /reported/.test(l[0])).length, 1, 'one line per viewer and farm a day');
+    assert.ok(!JSON.stringify(lines).includes(c.id), 'the log has the farm tag, never the id');
+    for (let i = 0; i < 3; i++) await post(jb.worldKey, '/api/w/valley/report', { farmId: a.id, reason: 'spam' });
+    assert.equal((await post(jb.worldKey, '/api/w/valley/report', { farmId: a.id, reason: 'spam' })).status, 429);
+  } finally {
+    await s.close();
+  }
 });

@@ -9,7 +9,7 @@
 // Live: the roster every 4 s and each farm's thumbnail every 12 s (an ETag: an unchanged farm costs a 304), only while
 // the map is open. Nothing here acts on a farm.
 import { t } from '../i18n/index.js';
-import { worldOf, fetchRoster, fetchThumb, visitPath, farmPath } from './base.js';
+import { worldOf, fetchRoster, fetchThumb, visitPath, farmPath, valleyViewer } from './base.js';
 import { drawThumb } from './thumb-draw.js';
 
 const ROSTER_MS = 4000;
@@ -93,6 +93,14 @@ export function openValleyMap({ homeId, here = homeId, doc = document } = {}) {
   const status = el(doc, 'p', 'hhv-status', t('world.valley.loading'));
   status.setAttribute('role', 'status');
   const foot = el(doc, 'footer', 'hhv-foot');
+  const unhide = el(doc, 'button', 'btn btn--paper btn--small hhv-unhide');
+  unhide.type = 'button';
+  unhide.hidden = true;
+  unhide.addEventListener('click', async () => {
+    const r = await valleyViewer('hide', w.worldKey, { hide: false });
+    if (r.ok) refreshRoster();
+  });
+  foot.append(unhide);
   if (here !== homeId) {
     const home = el(doc, 'button', 'btn btn--sky hhv-home', t('world.home'));
     home.type = 'button';
@@ -191,7 +199,51 @@ export function openValleyMap({ homeId, here = homeId, doc = document } = {}) {
       } else go(visitPath(m.farmId, homeId), b);
     });
     li.append(b);
+    if (w.kind === 'public' && !m.self) li.append(moreFor(m));
     return li;
+  }
+
+  /** A neighbour's "…": Hide this farm (for this viewer only), Report name (one log line on the server). */
+  function moreFor(m) {
+    const wrap = el(doc, 'div', 'hhv-more-wrap');
+    const more = el(doc, 'button', 'hhv-more', '\u22EF');
+    more.type = 'button';
+    more.setAttribute('aria-haspopup', 'menu');
+    more.setAttribute('aria-expanded', 'false');
+    more.setAttribute('aria-label', t('world.valley.more', { farm: nameOf(m) }));
+    const menu = el(doc, 'div', 'paper hhv-menu');
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+    const item = (text, fn, cls = '') => {
+      const x = el(doc, 'button', `hhv-menu-item${cls}`, text);
+      x.type = 'button';
+      x.setAttribute('role', 'menuitem');
+      x.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+      return x;
+    };
+    const say = (text) => menu.replaceChildren(el(doc, 'p', 'hhv-menu-note', text));
+    const main = () => menu.replaceChildren(
+      item(t('world.valley.hide'), async () => {
+        const r = await valleyViewer('hide', w.worldKey, { farmId: m.farmId, hide: true });
+        if (!r.ok) { say(t('world.valley.failed')); return; }
+        menu.hidden = true;
+        thumbs.delete(m.farmId);
+        refreshRoster();
+      }),
+      item(t('world.valley.report'), () => menu.replaceChildren(el(doc, 'p', 'hhv-menu-note', t('world.valley.reportWhy')),
+        ...['offensive', 'spam', 'other'].map((why) => item(t(`world.valley.reason.${why}`), async () => {
+          const r = await valleyViewer('report', w.worldKey, { farmId: m.farmId, reason: why });
+          say(t(r.ok ? 'world.valley.reported' : 'world.valley.failed'));
+        }, ' why')))));
+    const toggle = (open) => {
+      for (const o of plots.querySelectorAll('.hhv-menu')) if (o !== menu) { o.hidden = true; o.previousSibling?.setAttribute('aria-expanded', 'false'); }
+      menu.hidden = !open;
+      more.setAttribute('aria-expanded', String(open));
+      if (open) { main(); menu.querySelector('button')?.focus({ preventScroll: true }); }
+    };
+    more.addEventListener('click', (e) => { e.stopPropagation(); toggle(menu.hidden); });
+    wrap.append(more, menu);
+    return wrap;
   }
 
   function render() {
@@ -202,6 +254,8 @@ export function openValleyMap({ homeId, here = homeId, doc = document } = {}) {
     for (let s = 1; s <= max; s++) cells.push(plotFor(bySeat.get(s) ?? null, s - 1));
     plots.replaceChildren(...cells);
     plots.dataset.n = String(max);
+    unhide.hidden = !roster.hidden;
+    if (roster.hidden) unhide.textContent = t('world.valley.hidden', { n: roster.hidden });
     status.textContent = bySeat.size <= 1 ? t('world.valley.alone') : '';
   }
 
@@ -219,9 +273,10 @@ export function openValleyMap({ homeId, here = homeId, doc = document } = {}) {
     const r = await fetchRoster(w.worldKey);
     if (stopped) return;
     if (r.ok) {
-      const before = roster ? JSON.stringify(roster.members) : '';
-      roster = r.body;
-      if (JSON.stringify(roster.members) !== before) {
+      const before = roster ? JSON.stringify([roster.members, roster.hidden]) : '';
+      // a neighbour's open "…" menu is not pulled from under the finger: the change waits for the next poll
+      if (!(roster && plots.querySelector('.hhv-menu:not([hidden])'))) roster = r.body;
+      if (JSON.stringify([roster.members, roster.hidden]) !== before) {
         render();
         refreshThumbs(false);
       }
@@ -258,8 +313,19 @@ export function openValleyMap({ homeId, here = homeId, doc = document } = {}) {
     thumbTimer = setTimeout(async () => { await refreshThumbs(true); if (!stopped) loopThumbs(); }, THUMB_MS);
   }
 
+  const openMenu = () => plots.querySelector('.hhv-menu:not([hidden])');
+  sheet.addEventListener('click', (e) => {
+    const o = openMenu();
+    if (o && !o.parentNode.contains(e.target)) { o.hidden = true; o.previousSibling?.setAttribute('aria-expanded', 'false'); }
+  });
   function onKey(e) {
-    if (e.key === 'Escape') { e.stopPropagation(); closeMap(); return; }
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      const o = openMenu();
+      if (o) { o.hidden = true; o.previousSibling?.setAttribute('aria-expanded', 'false'); o.previousSibling?.focus(); return; }
+      closeMap();
+      return;
+    }
     if (e.key !== 'Tab') return;
     const f = [...sheet.querySelectorAll('button:not([disabled])')];
     if (!f.length) return;

@@ -7,8 +7,8 @@
 //   - act / acts       answered rej SELF_ONLY, one per action (never applied: the server refuses, not just the UI)
 //   - ping / resync    answered (pong; a fresh welcome)
 //   - mv, ghost, emote, mark, chat   dropped (a visitor has no avatar on this farm in phase 1)
-// A visitor from a PUBLIC valley (server/world/valley.js: strangers) also gets no chat: an empty log in the welcome and
-// no live chat lines.
+// A visitor never gets the farmers' private text (server/world/redact.js): no chat (an empty log, no live lines), no
+// sticky-note, gift or Memory Book text, no ledger; only delta, presence, peer, emote and mark frames.
 // Visitors do not count as members, are not in the slot list, never trigger _seen / Together / bench facts, and do not
 // keep the farm's lastSeenAt fresh. The world registry knows where every member is (the roster's "visiting").
 //
@@ -19,6 +19,7 @@ import { TOKENS_KEPT } from '../sessions.js';
 import { MSG, ERR, PROTOCOL_VERSION, cleanName } from '../../shared/net/protocol.js';
 import { CONTENT_HASH } from '../../shared/content/index.js';
 import { RULES_VERSION } from '../../shared/rules/version.js';
+import { redactState, redactDelta, VISITOR_FRAMES } from './redact.js';
 
 /** The FarmSessions class of a host with a world layer: visitors are looked up in `world` (a WorldRegistry). */
 export function worldSessions(world) {
@@ -51,9 +52,9 @@ export function worldSessions(world) {
       const owner = Object.keys(this.state.players).sort()[0] ?? null;
       const msg = {
         t: MSG.WELCOME, proto: PROTOCOL_VERSION, pid: null, visitor: { seat: conn.visitor.seat, name: conn.visitor.name }, owner,
-        state: this.state, v: this.engine.v, serverNow: this.clock.now(), lastSeq: 0, known: true, rejected: [],
-        // a public valley's visitor is a stranger: the farmers' chat stays theirs (05-valley-map.md, privacy)
-        contentHash: CONTENT_HASH, rulesVersion: RULES_VERSION, peers: this.peers(null), chat: conn.visitor.pub ? [] : this.chatLog,
+        state: redactState(this.state), v: this.engine.v, serverNow: this.clock.now(), lastSeq: 0, known: true, rejected: [],
+        // the farmers' chat and private text stay theirs (redact.js; 05-valley-map.md, privacy)
+        contentHash: CONTENT_HASH, rulesVersion: RULES_VERSION, peers: this.peers(null), chat: [],
       };
       if (this.build) msg.buildHash = this.build;
       this.send(conn, msg, true);
@@ -82,8 +83,14 @@ export function worldSessions(world) {
 
     broadcast(msg, exceptPid = null) {
       const s = JSON.stringify(msg);
-      const chat = msg.t === MSG.CHAT;
-      for (const c of this.conns) if ((c.pid && c.pid !== exceptPid) || (c.visitor && !(chat && c.visitor.pub))) c.out.push(s);
+      let forVisitors;                                   // made once per frame, only when a visitor is here
+      for (const c of this.conns) {
+        if (c.pid && c.pid !== exceptPid) c.out.push(s);
+        else if (c.visitor && VISITOR_FRAMES.has(msg.t)) {
+          forVisitors ??= msg.t === MSG.DELTA ? JSON.stringify(redactDelta(msg)) : s;
+          c.out.push(forVisitors);
+        }
+      }
     }
 
     presenceOut(msg) {

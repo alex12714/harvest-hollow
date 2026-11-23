@@ -230,7 +230,8 @@ export class Valley {
    * colour, online, how many are looking at it, and the farm id a visit needs. No role, no "who visits whom".
    */
   roster(w, me) {
-    const members = this.live(w).sort((a, b) => a.seat - b.seat).map((m) => {
+    const hidden = new Set(Array.isArray(me.hidden) ? me.hidden : []);
+    const members = this.live(w).filter((m) => !hidden.has(m.farmId)).sort((a, b) => a.seat - b.seat).map((m) => {
       const rec = this.reg.rec(m.farmId);
       this.refresh(m, faceOf(stateOf(rec)));
       let online = false;
@@ -240,7 +241,28 @@ export class Valley {
       return { seat: m.seat, name: m.name || NAME_FALLBACK, farmName: m.farmName ?? null, color: m.color ?? null, farmId: m.farmId,
         online, visiting: null, visitors, self: m.seat === me.seat };
     });
-    return { wid: w.wid, kind: 'public', title: null, max: this.max, me: { seat: me.seat, farmId: me.farmId }, members };
+    return { wid: w.wid, kind: 'public', title: null, max: this.max, me: { seat: me.seat, farmId: me.farmId },
+      hidden: [...hidden].filter((id) => this.live(w).some((m) => m.farmId === id)).length, members };
+  }
+
+  /**
+   * "Hide this farm" for one viewer: the viewer's farm (member `me` of valley `w`) keeps a list of neighbours it does
+   * not want to see; the roster leaves them out for that viewer only. `farmId` null with hide false: show them all again.
+   * -> { ok, hidden: n } | { error: 'NOT_FOUND' }
+   */
+  hide(w, me, farmId, hide) {
+    let list = Array.isArray(me.hidden) ? me.hidden : [];
+    if (farmId === null) {
+      if (hide) return { error: 'NOT_FOUND' };
+      list = [];
+    } else {
+      const there = this.live(w).some((m) => m.farmId === farmId);
+      if (!there || farmId === me.farmId) return { error: 'NOT_FOUND' };
+      list = hide ? [...new Set([...list, farmId])].slice(-64) : list.filter((id) => id !== farmId);
+    }
+    me.hidden = list;
+    this.world.save(w);
+    return { ok: true, hidden: list.length };
   }
 
   /** Every sweep: members whose farm is gone (or opted out) leave; an empty valley goes; stale opt-outs are forgotten. */
