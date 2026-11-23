@@ -1,0 +1,27 @@
+// English catalog, area 'world' (OnFire world layer, public/js/world/): the neighbours panel on a world farm, the
+// read-only visit page, and the launch page a call opens (/join, /embed). Strings only; the server sends codes.
+export default {
+  'world.neighbours': 'Neighbours',
+  'world.title': 'Your neighbours',
+  'world.close': 'Close',
+  'world.you': 'You',
+  'world.online': 'On their farm',
+  'world.away': 'Away',
+  'world.visit': 'Visit',
+  'world.visitingName': 'Visiting {name}',
+  'world.visitors': { one: '{n} visitor', other: '{n} visitors' },
+  'world.noFarm': 'No farm yet',
+  'world.home': 'Back home',
+  'world.lookOnly': "{name}'s farm. You can look around; only {name} can change it.",
+  'world.rosterFailed': "Couldn't load your neighbours. Retrying…",
+  'world.connecting': 'Connecting…',
+  'world.reconnecting': 'Disconnected. Reconnecting…',
+  'world.unavailable': 'This farm is not open to you right now.',
+  'world.noWorld': 'Open the farm from your call first.',
+  'world.launch.opening': 'Opening your farm…',
+  'world.launch.waiting': 'Waiting for the call…',
+  'world.launch.invalid': 'This link has expired or was already used. Open the farm again from the call.',
+  'world.launch.full': 'This world already has as many farms as it can hold.',
+  'world.launch.failed': "Couldn't open the farm. Try again.",
+  'world.launch.rate': 'Too many tries. Wait a minute and try again.',
+};

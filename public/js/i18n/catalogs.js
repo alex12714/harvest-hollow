@@ -28,6 +28,7 @@ import dock from './en/dock.js';
 import cheer from './en/cheer.js';
 import feat from './en/feat.js';
 import boot from './en/boot.js';
+import world from './en/world.js';
 
 /** [area, English catalog, Bulgarian loader] in load order. */
 export const AREAS = [
@@ -65,6 +66,8 @@ export const AREAS = [
   ['cheer', cheer, () => import('./bg/cheer.js')],
   ['feat', feat, () => import('./bg/feat.js')],
   ['boot', boot, () => import('./bg/boot.js')],
+  // OnFire world layer (public/js/world/): neighbours, visits, the call's launch page
+  ['world', world, () => import('./bg/world.js')],
 ];
 
 /**

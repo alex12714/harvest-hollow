@@ -255,7 +255,7 @@ export class FarmRegistry {
     try {
       hh = await openFarm(cfg, { log: farmLog(this.log, rec.id), dir: rec.dir, perf: this.perf, staticFiles: this.staticFiles,
         persistOpts: { backupHours: this.mc.backupHours, backupDays: this.mc.backupDays },
-        makeSessions: (o) => new FarmSessions(o, hooks) });
+        makeSessions: (o) => new (this.Sessions ?? FarmSessions)(o, hooks) });   // world layer: server/world/sessions.js
     } catch (err) {
       // a refused boot of one farm (a journal that does not replay...) keeps its files for a human; the host goes on
       this.log.error('a farm could not be loaded; its files are kept as they are', { farm: farmTag(rec.id) }, redactArg(err));
@@ -405,7 +405,7 @@ export class FarmRegistry {
     const ttl = this.mc.ttlDays * 86_400_000;
     let n = 0;
     for (const rec of [...this.recs.values()]) {
-      if (this.busy(rec)) continue;
+      if (this.busy(rec) || this.keep?.(rec.id)) continue;      // keep: a farm of a living world (server/world)
       const last = Number.isFinite(rec.meta.lastSeenAt) ? rec.meta.lastSeenAt : rec.meta.createdAt;
       if (!(now - last >= ttl)) continue;
       if (rec.host) await this.unload(rec);

@@ -47,6 +47,7 @@ import { FarmRegistry, ID_RE, redactArg, redactLog } from './farms.js';
 import { WindowLimiter, Counter, clientIp, maskIp } from './ip-limits.js';
 import { multiConfig } from './config.js';
 import { mountIdeas, ideasConfig } from './ideas.js';
+import { attachWorld, mountWorld } from './world/index.js';
 import { StarCount } from './stars.js';
 import { isTimeZone } from '../shared/rules/calendar.js';
 import { LIMITS, PROTOCOL_VERSION } from '../shared/net/protocol.js';
@@ -379,6 +380,7 @@ export function createMultiApp(hh) {
     farmApi.use('/harness', hh.harness.router);
     hh.harness.mountAssets(app);
   }
+  if (hh.world) mountWorld(app, hh, { sameOrigin });    // worlds of farms, s2s + launch + visits (server/world)
   app.use('/api/f/:id', farmApi);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not found' }));
   // Express's default handler prints the stack (a path may name a farm): a body that is not JSON is the client's
@@ -409,6 +411,7 @@ export async function startMultiServer(cfg) {
   const sockets = new Counter();
   hh.sockets = sockets;
 
+  attachWorld(hh);                                   // the world layer, when HH_WORLD_SECRET is set (server/world)
   const { createMultiHarness } = await import('./harness/index.js');
   hh.harness = await createMultiHarness(hh);
   const app = createMultiApp(hh);
