@@ -1,0 +1,35 @@
+/* OnFire world layer (public/js/world/): the neighbours pill and card, the visit page's banner, the launch page.
+   Built on the game's own pieces (.paper, .btn, the colour tokens of style.css). */
+.hhw-strip { position: fixed; z-index: 60; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; font-family: var(--font-ui, system-ui); }
+.hhw-strip > * { pointer-events: auto; }
+.hhw-pill { gap: 8px; }
+.hhw-dots:not(:empty) { min-width: 1.6em; padding: 1px 6px; border-radius: var(--r-pill, 999px); background: #fff; color: var(--sky-900, #1C5283);
+  font-size: .8125rem; text-shadow: none; }
+.hhw-card { width: min(360px, calc(100vw - 32px)); max-height: min(70vh, 520px); overflow: auto; padding: 14px 16px 12px; }
+.hhw-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.hhw-title { margin: 0; font: 700 1.125rem/1.2 var(--font-ui, system-ui); color: var(--ink-900, #3b2a1a); }
+.hhw-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.hhw-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-m, 12px); background: rgba(255, 255, 255, .55);
+  box-shadow: inset 0 0 0 1.5px var(--paper-edge, #d9b57a); }
+.hhw-row.here { box-shadow: inset 0 0 0 2.5px var(--sky-700, #2B78B5); }
+.hhw-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: #b9ac97; box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .15); }
+.hhw-dot.on { background: var(--go-500, #4C9A3E); }
+.hhw-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hhw-name { font-weight: 700; color: var(--ink-900, #3b2a1a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hhw-sub { font-size: .8125rem; color: var(--ink-500, #7a6650); }
+.hhw-status:empty { display: none; }
+.hhw-status { margin: 8px 0 0; font-size: .875rem; color: var(--stop-700, #a33); }
+/* the visit page */
+body.hhw-visit { margin: 0; overflow: hidden; background: #8fc46a; }
+body.hhw-visit #world { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+body.hhw-visit #overlay { position: fixed; inset: 0; pointer-events: none; }
+.hhw-banner { position: fixed; z-index: 55; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); transform: translateX(-50%);
+  margin: 0; padding: 10px 16px; max-width: calc(100vw - 32px); font: 600 1rem/1.35 var(--font-ui, system-ui); text-align: center; }
+.hhw-banner:empty { display: none; }
+/* the launch page (/join, /embed) */
+body.hhw-launch { margin: 0; min-height: 100vh; display: grid; place-items: center; background: linear-gradient(180deg, #bfe3f5, #8fc46a); }
+.hhw-launch-card { padding: 24px 28px; max-width: min(420px, calc(100vw - 32px)); text-align: center; }
+.hhw-launch-logo { width: 220px; height: auto; }
+.hhw-launch-status { margin: 12px 0 0; font: 600 1.0625rem/1.4 var(--font-ui, system-ui); color: var(--ink-900, #3b2a1a); }
+@media (prefers-reduced-motion: reduce) { .hhw-strip * { transition: none !important; animation: none !important; } }

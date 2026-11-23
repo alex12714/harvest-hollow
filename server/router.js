@@ -89,6 +89,7 @@ export function handleMessage(hh, conn, raw) {
       if (!take('hello')) return abuse(hh, conn);
       return hh.sessions.hello(conn, m);
     }
+    if (conn.visitor) return hh.sessions.visitorFrame(conn, m);       // a world neighbour, read-only (server/world)
     if (!conn.pid) return conn.joining ? undefined : abuse(hh, conn);   // nothing but hello before joining
     const who = { pid: conn.pid, cid: conn.cid };
     switch (m.t) {
