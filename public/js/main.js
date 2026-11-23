@@ -321,8 +321,9 @@ function onWelcome(w) {
     const text = unsavedText(unsavedMemo.get());
     unsavedMemo.clear();
     if (text) ui.notice(text);
-    // OnFire world layer: the neighbours panel on a farm this device opened from a call (public/js/world/strip.js)
-    if (farm.multi) import('./world/strip.js').then((m) => m.mountWorldStrip({ homeId: farm.id })).catch(() => {});
+    // OnFire world layer: the call world's neighbours, or this farm's public valley, and the valley map
+    // (public/js/world/valley.js); after this welcome has set session.secret
+    if (farm.multi && ui.valley) setTimeout(() => { ui.valley.start().catch(() => {}); }, 0);
   } else {
     // a reconnect (or a server restart): the server forgot my pose and put me back at the porch; send where I
     // really stand, as a hop, even if I never move again (coop-robust-06: the partner saw me at the porch and a

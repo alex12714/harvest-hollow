@@ -7,6 +7,7 @@
 import { worldConfig } from './config.js';
 import { WorldRegistry } from './registry.js';
 import { worldSessions } from './sessions.js';
+import { Valley } from './valley.js';
 
 export { mountWorld } from './routes.js';
 
@@ -16,11 +17,13 @@ export function attachWorld(hh, env = process.env) {
   if (!wc) return null;
   const world = new WorldRegistry({ wc, reg: hh.reg, log: hh.log, dataDir: hh.cfg.dataDir });
   const n = world.scan();
+  // public valleys for farms started on this host (server/world/valley.js); off with HH_VALLEY=off
+  if (wc.valley !== false) world.valley = new Valley({ world, max: wc.valleyMax ?? 8 }).load();
   hh.wc = wc;
   hh.world = world;
   hh.reg.Sessions = worldSessions(world);
   hh.reg.keep = (id) => world.keep(id);
   hh.reg.sweepers.push(async (now) => world.sweep(now));
-  hh.log.info(`worlds: on (${n} stored, up to ${wc.maxMembers} farms each)`);
+  hh.log.info(`worlds: on (${n} stored, up to ${wc.maxMembers} farms each${world.valley ? `; public valleys of ${world.valley.max}` : ''})`);
   return world;
 }

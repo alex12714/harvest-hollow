@@ -262,6 +262,8 @@ export function createLayout(S) {
           sections.push(sec('together', t('dock.book.together'), h('div.m-tiles',
             tile('letter', t('social.menu.invite'), { invite: 'open' }, () => { ctx.close(); S.invite.open(); }, t('multi.invite.title')))));
         }
+        // OnFire valley map (world/valley.js): hidden until this farm has a valley
+        if (S.valley && ['public', 'call'].includes(S.valley.mode)) sections.push(sec('valley', t('world.valley.title'), h('div.m-tiles', S.valley.tile(() => ctx.close()))));
         sections.push(sec('settings', t('game.key.settings'), h('div.m-tiles',
           tile('gear', t('game.key.settings'), { tile: 'settings' }, () => { ctx.close(); ui.panels.open('settings'); }))));
       }

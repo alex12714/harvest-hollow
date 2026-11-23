@@ -109,6 +109,7 @@ import { farmManifestHref } from './farm-gate.js';
 import { langToggle } from './lang-toggle.js';
 import { createKeepUi } from './keep.js';
 import { createPrivacyUi } from './privacy.js';
+import { createValleyUi } from '../world/valley.js';
 import { bootHarness } from './harness/boot.js';
 import { farm } from '../net/farm.js';
 import { lazyImport, importFailed } from '../net/lazy.js';
@@ -903,6 +904,9 @@ export const ui = {
     ctx.ideas = document.querySelector?.('meta[name="hh-ideas"]')?.getAttribute('content') === 'off' ? null : createIdeasUi(ctx);
     // Settings > Farm's Privacy section (every mode) and "Delete this farm now" (multi only): ui/privacy.js
     ctx.privacy = createPrivacyUi(ctx);
+    // multi-farm mode only (null otherwise): the public valley, its map and the Settings opt-out (world/valley.js)
+    ctx.valley = createValleyUi(ctx);
+    ui.valley = ctx.valley;
     const hud = createHud(ctx);
     ctx.hud = hud;
     const tips = createTips(ctx);

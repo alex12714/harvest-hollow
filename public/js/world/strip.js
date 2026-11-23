@@ -3,8 +3,9 @@
 // Visit button per neighbour (a read-only look at their farm, /w/visit/<id>) or Back home while visiting. Shown only on
 // a device that opened its farm from the call (base.js worldOf); everywhere else nothing is added to the page.
 //
-//   mountWorldStrip({ homeId, here, doc? }) -> { stop() } | null
+//   mountWorldStrip({ homeId, here, doc?, onMap? }) -> { stop() } | null
 //     homeId  this device's own farm in the world;  here  the farm on screen (home, or the one being visited)
+//     onMap   opens the valley map (valley-map.js): a Valley pill beside Neighbours
 import { t } from '../i18n/index.js';
 import { worldOf, fetchRoster, visitPath, farmPath } from './base.js';
 
@@ -27,12 +28,22 @@ function ensureCss(doc) {
   doc.head.append(l);
 }
 
-export function mountWorldStrip({ homeId, here = homeId, doc = document, onVisit = null } = {}) {
+export function mountWorldStrip({ homeId, here = homeId, doc = document, onVisit = null, onMap = null } = {}) {
   const w = worldOf(homeId);
   if (!w) return null;
+  // one strip per page (the call's launch and the public valley's join may both ask for it)
+  if (doc.querySelector('[data-hhw="strip"]')) return null;
   ensureCss(doc);
   const root = el(doc, 'div', 'hhw-strip');
   root.setAttribute('data-hhw', 'strip');
+  const pills = el(doc, 'div', 'hhw-pills');
+  // the valley map (valley-map.js): a pill beside Neighbours
+  const mapPill = onMap ? el(doc, 'button', 'btn btn--sun btn--small hhw-pill hhw-map', t('world.valley.open')) : null;
+  if (mapPill) {
+    mapPill.type = 'button';
+    mapPill.setAttribute('aria-haspopup', 'dialog');
+    mapPill.addEventListener('click', () => onMap());
+  }
   const pill = el(doc, 'button', 'btn btn--sky btn--small hhw-pill');
   pill.type = 'button';
   pill.setAttribute('aria-expanded', 'false');
@@ -54,7 +65,8 @@ export function mountWorldStrip({ homeId, here = homeId, doc = document, onVisit
   const status = el(doc, 'p', 'hhw-status');
   status.setAttribute('role', 'status');
   card.append(head, list, status);
-  root.append(pill, card);
+  pills.append(...[mapPill, pill].filter(Boolean));
+  root.append(pills, card);
   doc.body.append(root);
 
   const toggle = (open) => {

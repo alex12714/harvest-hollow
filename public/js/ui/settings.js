@@ -459,6 +459,8 @@ export function createSettings(S) {
         if (S.ideas) grid.append(...S.ideas.settingsRows(ctx));
         // the privacy note, and (multi-farm mode) "Delete this farm now": ui/privacy.js
         if (S.privacy) grid.append(...S.privacy.settingsRows(ctx));
+        // OnFire: "Show my farm in the valley" (world/valley.js)
+        if (S.valley) grid.append(...S.valley.settingsRows(ctx));
       }
       body.append(grid);
     },

@@ -68,12 +68,12 @@ try {
 
   // 4. the neighbours panel on Ben's farm lists all three; Visit Ana
   await B.waitForSelector('.hhw-pill', { timeout: 30_000 });
-  await B.click('.hhw-pill');
+  await B.click('.hhw-pill:not(.hhw-map)');
   await B.waitForFunction(() => document.querySelectorAll('.hhw-row').length === 3, { timeout: 15_000 });
   const rows = await B.evaluate(() => [...document.querySelectorAll('.hhw-row')].map((r) => r.innerText.replace(/\s+/g, ' ')));
   check('Ben\'s neighbours panel: Ana, Ben (You), Cleo', rows.length === 3 && /Ana/.test(rows[0]) && /Ben/.test(rows[1]) && /Cleo/.test(rows[2]), JSON.stringify(rows));
   await B.screenshot({ path: path.join(OUT, '1-ben-home-neighbours.png') });
-  await Promise.all([B.waitForNavigation({ timeout: 30_000 }), B.click(`.hhw-go[data-farm="${farmA}"]`)]);
+  await Promise.all([B.waitForNavigation({ timeout: 30_000 }), B.evaluate((id) => document.querySelector(`.hhw-go[data-farm="${id}"]`).click(), farmA)]);
   await B.waitForFunction(() => window.__hhVisit?.state?.players?.p1, { timeout: 90_000, polling: 100 });
   const v = await B.evaluate(() => ({ owner: window.__hhVisit.owner, name: window.__hhVisit.state.players.p1.name, path: location.pathname,
     banner: document.getElementById('hhw-visit-banner').textContent }));
@@ -87,7 +87,7 @@ try {
   check('Ana plants wheat; Ben sees it live', !before, `${Date.now() - t0} ms from Ana's act to Ben's state (incl. polling)`);
   await A.evaluate((x) => window.__hh.view.focus(x.x, x.z), { x: 20, z: 20 });
   await new Promise((r) => setTimeout(r, 2500));
-  await B.click('.hhw-pill');
+  await B.click('.hhw-pill:not(.hhw-map)');
   await new Promise((r) => setTimeout(r, 800));
   await B.screenshot({ path: path.join(OUT, '2-ben-visits-ana.png') });
   await A.screenshot({ path: path.join(OUT, '3-ana-home.png') });

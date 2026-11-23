@@ -240,7 +240,7 @@ export class WorldRegistry {
     if (!got) return null;
     const at = this.byFarm.get(farmId);
     if (!at || at.wid !== got.world.wid || got.member.farmId === farmId) return null;
-    return { wid: got.world.wid, seat: got.member.seat, name: got.member.name };
+    return { wid: got.world.wid, seat: got.member.seat, name: got.member.name, pub: got.world.kind === 'public' };
   }
 
   /** A visitor socket opened (+1) or closed (-1) on farm `farmId`. */
@@ -268,6 +268,7 @@ export class WorldRegistry {
 
   /** The world's members as one member sees them (GET /api/w/roster). */
   roster(w, me) {
+    if (w.kind === 'public' && this.valley) return this.valley.roster(w, me);
     const members = [...w.members].sort((a, b) => a.seat - b.seat).map((m) => {
       const rec = m.farmId ? this.reg.rec(m.farmId) : null;
       let online = false;
@@ -282,15 +283,23 @@ export class WorldRegistry {
     return { wid: w.wid, title: w.title, max: this.wc.maxMembers, me: { seat: me.seat, farmId: me.farmId }, members };
   }
 
-  /** True while `farmId` belongs to a living world (the farm sweep leaves it alone). */
-  keep(farmId) { return this.byFarm.has(farmId); }
+  /**
+   * True while `farmId` belongs to a living call world (the farm sweep leaves it alone). A public valley
+   * (server/world/valley.js) does not keep its farms: they age out exactly like any farm, and leave the valley then.
+   */
+  keep(farmId) {
+    const at = this.byFarm.get(farmId);
+    return Boolean(at) && this.worlds.get(at.wid)?.kind !== 'public';
+  }
 
   /** Forget worlds nobody launched or visited for ttlDays (their farms then follow the farm retention). */
   sweep(now = this.wall()) {
     const ttl = this.wc.ttlDays * 86_400_000;
+    if (this.valley) this.valley.prune();
     if (!(ttl > 0)) return { area: 'worlds', expired: 0 };
     let n = 0;
     for (const w of [...this.worlds.values()]) {
+      if (w.kind === 'public') continue;               // a public valley lives as long as its farms (valley.js prune)
       if (w.members.some((m) => {
         const rec = m.farmId ? this.reg.rec(m.farmId) : null;
         return Boolean(rec && rec.host && rec.host.status().conns);

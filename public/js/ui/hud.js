@@ -450,6 +450,8 @@ export function createHud(S) {
     menuBtn('smile', 'hud.edge.look', null, () => { if (ui.panels.has('avatar')) ui.panels.open('avatar'); }, { id: 'hud-look' }),
     // multi-farm mode only (ui/invite.js): a one-time link for the second farmer
     S.invite ? menuBtn('letter', 'multi.invite.title', null, () => S.invite.open(), { id: 'hud-invite' }) : null,
+    // OnFire valley map (world/valley.js): hidden until this farm has a valley
+    S.valley ? S.valley.menuItem(() => closeMenu()) : null,
     soundBtn);
   const moreBtn = edgeBtn('gear', 'hud.edge.more', null, () => (menu.hidden ? openMenu() : closeMenu()),
     { id: 'hud-more', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'hud-gear-menu' });

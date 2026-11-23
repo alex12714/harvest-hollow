@@ -4,8 +4,10 @@
 //   appBase(pathname)       '' or '/g/farm': the part of the path before /f/<id>, /w/visit/<id>, /join or /embed
 //   url(p)                  appBase() + p ('/api/w/roster' -> '/g/farm/api/w/roster')
 //   wsUrl(farmId)           the farm socket of this host
-//   saveWorld / worldOf     localStorage 'hh.world.<home farm id>' = { wid, worldKey, seat, farmId } (the world key
-//                           lets this device list its neighbours and look at their farms; it never leaves this origin)
+//   saveWorld / worldOf     localStorage 'hh.world.<home farm id>' = { wid, worldKey, seat, farmId, kind? } (the world key
+//                           lets this device list its neighbours and look at their farms; it never leaves this origin;
+//                           kind 'public': a public valley, server/world/valley.js)
+//   valleyCall / fetchThumb  the public valley's join / leave, and the valley map's thumbnails
 
 const SUFFIX = /\/(?:f\/[A-Za-z0-9_-]{6,64}|w\/visit\/[A-Za-z0-9_-]{6,64}|join|embed)\/?$/;
 const ID_RE = /^[a-z2-7]{12}$/;
@@ -35,8 +37,42 @@ export function worldOf(homeId, store = globalThis.localStorage) {
 }
 
 export function saveWorld(w, store = globalThis.localStorage) {
-  try { store.setItem(`hh.world.${w.farmId}`, JSON.stringify({ wid: w.wid, worldKey: w.worldKey, seat: w.seat, farmId: w.farmId })); }
-  catch { /* storage blocked: the neighbours panel is not offered on this device */ }
+  try {
+    store.setItem(`hh.world.${w.farmId}`, JSON.stringify({ wid: w.wid, worldKey: w.worldKey, seat: w.seat, farmId: w.farmId,
+      ...(w.kind === 'public' ? { kind: 'public' } : {}) }));
+  } catch { /* storage blocked: the neighbours panel is not offered on this device */ }
+}
+
+/** This device forgets its world entry for `homeId` (the farm left its valley, or the world forgot the key). */
+export function forgetWorld(homeId, store = globalThis.localStorage) {
+  try { store.removeItem(`hh.world.${homeId}`); } catch { /* nothing to forget */ }
+}
+
+/**
+ * A public valley (server/world/valley-routes.js): POST /api/w/valley/join | leave with a member key of the farm.
+ * -> { ok: true, body } | { ok: false, status, code }
+ */
+export async function valleyCall(what, { farmId, secret, worldKey = null, rejoin = false }, fetcher = globalThis.fetch) {
+  try {
+    const r = await fetcher(url(`/api/w/valley/${what}`), {
+      method: 'POST', cache: 'no-store',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ farmId, ...(worldKey ? { worldKey } : {}), ...(rejoin ? { rejoin: true } : {}) }),
+    });
+    const body = await r.json().catch(() => null);
+    return r.ok ? { ok: true, body } : { ok: false, status: r.status, code: body?.error ?? null };
+  } catch { return { ok: false, status: 0, code: 'NET' }; }
+}
+
+/** A farm's map thumbnail (server/world/thumb.js): { ok, body, etag } | { ok: true, same: true } (304) | { ok: false, status }. */
+export async function fetchThumb(worldKey, farmId, etag = null, fetcher = globalThis.fetch) {
+  try {
+    const r = await fetcher(url(`/api/w/thumb/${encodeURIComponent(farmId)}`), {
+      cache: 'no-cache', headers: { authorization: `Bearer ${worldKey}`, ...(etag ? { 'if-none-match': etag } : {}) },
+    });
+    if (r.status === 304) return { ok: true, same: true };
+    return r.ok ? { ok: true, body: await r.json(), etag: r.headers.get('etag') } : { ok: false, status: r.status };
+  } catch { return { ok: false, status: 0 }; }
 }
 
 /** The roster as this member sees it: { ok, body } | { ok: false, status }. */

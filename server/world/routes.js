@@ -10,6 +10,7 @@
 //   POST   /api/w/launch   { t, wid? }      -> 201 { wid, farmId, key, worldKey, seat, name, role, created }
 //   GET    /api/w/roster   Bearer <worldKey> -> { wid, title, max, me, members: [...] }
 //   GET    /api/w/config                    -> { embedOrigins }
+//   POST   /api/w/valley/join|leave, GET /api/w/thumb/:farmId   public valleys and the map (valley-routes.js)
 // Pages:  /join (phone: #t=<token>), /embed (call panel iframe: the token by postMessage), /w/visit/:farmId (a
 //         neighbour's farm, read-only)
 import express from 'express';
@@ -19,6 +20,7 @@ import { verifyJoinToken, JtiSet, WID_RE, FID_RE } from './token.js';
 import { verifyS2s, SeenSigs } from './s2s.js';
 import { ROOM_RE, worldTag } from './registry.js';
 import { isTimeZone } from '../../shared/rules/calendar.js';
+import { mountValley } from './valley-routes.js';
 
 const NO_STORE = 'no-store';
 const KEY_RE = /^[a-f0-9]{64}$/;
@@ -118,6 +120,9 @@ export function mountWorld(app, hh, { sameOrigin }) {
   });
 
   app.get('/api/w/config', (_req, res) => res.set('Cache-Control', 'no-cache').json({ embedOrigins: wc.embedOrigins }));
+
+  // public valleys (join / leave) and the valley map's thumbnails: server/world/valley-routes.js
+  mountValley(app, hh, { sameOrigin, ipOf });
 
   // ---- pages ----------------------------------------------------------------------------------------------------
   const page = (file, csp) => (req, res, next) => {

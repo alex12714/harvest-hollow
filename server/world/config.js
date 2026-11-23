@@ -14,6 +14,8 @@
 //   HH_WORLD_ISS               the join token's expected issuer (default call.onfire.so)
 //   HH_WORLD_EMBED_ORIGINS     comma list: who may post a token into /embed (default call + app2.onfire.so)
 //   HH_WORLD_FRAME_ANCESTORS   space list for /embed's frame-ancestors (default call, app, app2.onfire.so)
+//   HH_VALLEY                  'off': farms started on this host do not join public valleys (default on; valley.js)
+//   HH_VALLEY_MAX              farms per public valley (default 8)
 
 const DEFAULT_EMBED = ['https://call.onfire.so', 'https://app2.onfire.so'];
 const DEFAULT_ANCESTORS = ['https://call.onfire.so', 'https://app.onfire.so', 'https://app2.onfire.so'];
@@ -66,5 +68,7 @@ export function worldConfig(env = {}) {
     s2sWindowMs: 60_000,         // a server-to-server call's timestamp must be this fresh (01 §6)
     embedOrigins: Object.freeze(list(env.HH_WORLD_EMBED_ORIGINS, DEFAULT_EMBED, ',')),
     frameAncestors: Object.freeze(list(env.HH_WORLD_FRAME_ANCESTORS, DEFAULT_ANCESTORS, /\s+/)),
+    valley: String(env.HH_VALLEY ?? '').toLowerCase() !== 'off',
+    valleyMax: num(env.HH_VALLEY_MAX, 8, { min: 2, max: 64 }),
   });
 }

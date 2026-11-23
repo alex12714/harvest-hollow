@@ -7,6 +7,8 @@
 //   - act / acts       answered rej SELF_ONLY, one per action (never applied: the server refuses, not just the UI)
 //   - ping / resync    answered (pong; a fresh welcome)
 //   - mv, ghost, emote, mark, chat   dropped (a visitor has no avatar on this farm in phase 1)
+// A visitor from a PUBLIC valley (server/world/valley.js: strangers) also gets no chat: an empty log in the welcome and
+// no live chat lines.
 // Visitors do not count as members, are not in the slot list, never trigger _seen / Together / bench facts, and do not
 // keep the farm's lastSeenAt fresh. The world registry knows where every member is (the roster's "visiting").
 //
@@ -50,7 +52,8 @@ export function worldSessions(world) {
       const msg = {
         t: MSG.WELCOME, proto: PROTOCOL_VERSION, pid: null, visitor: { seat: conn.visitor.seat, name: conn.visitor.name }, owner,
         state: this.state, v: this.engine.v, serverNow: this.clock.now(), lastSeq: 0, known: true, rejected: [],
-        contentHash: CONTENT_HASH, rulesVersion: RULES_VERSION, peers: this.peers(null), chat: this.chatLog,
+        // a public valley's visitor is a stranger: the farmers' chat stays theirs (05-valley-map.md, privacy)
+        contentHash: CONTENT_HASH, rulesVersion: RULES_VERSION, peers: this.peers(null), chat: conn.visitor.pub ? [] : this.chatLog,
       };
       if (this.build) msg.buildHash = this.build;
       this.send(conn, msg, true);
@@ -79,7 +82,8 @@ export function worldSessions(world) {
 
     broadcast(msg, exceptPid = null) {
       const s = JSON.stringify(msg);
-      for (const c of this.conns) if ((c.pid && c.pid !== exceptPid) || c.visitor) c.out.push(s);
+      const chat = msg.t === MSG.CHAT;
+      for (const c of this.conns) if ((c.pid && c.pid !== exceptPid) || (c.visitor && !(chat && c.visitor.pub))) c.out.push(s);
     }
 
     presenceOut(msg) {

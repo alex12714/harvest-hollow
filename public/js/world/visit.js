@@ -119,7 +119,7 @@ async function boot() {
   await i18nReady();
   const w = worldOf(homeId);
   if (!farmId || !w) { say(t('world.noWorld')); return; }
-  mountWorldStrip({ homeId, here: farmId });
+  mountWorldStrip({ homeId, here: farmId, onMap: () => import('./valley-map.js').then((m) => m.openValleyMap({ homeId, here: farmId })) });
   say(t('world.connecting'));
   const canvas = document.getElementById('world');
   await view.init(canvas, { quality: 'auto', now: serverNow, overlay: document.getElementById('overlay') });
