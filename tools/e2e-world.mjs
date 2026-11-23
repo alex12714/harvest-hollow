@@ -32,7 +32,7 @@ const mint = (wid, n, name) => {
 const room = `room-${Date.now()}`;
 const p = `/api/s2s/worlds/${room}`;
 const body = JSON.stringify({ title: 'E2E call' });
-const put = await fetch(BASE + p, { method: 'PUT', headers: { 'content-type': 'application/json', ...signS2s(KEY, { method: 'PUT', path: p, body }) }, body });
+const put = await fetch(BASE + p, { method: 'PUT', headers: { 'content-type': 'application/json', ...signS2s(KEY, { method: 'PUT', path: new URL(BASE).pathname.replace(/\/+$/, '') + p, body }) }, body });
 const world = await put.json();
 check('s2s PUT world -> 201 { wid }', put.status === 201 && /^[0-9a-f-]{36}$/.test(world.wid), `${put.status}`);
 const wid = world.wid;
