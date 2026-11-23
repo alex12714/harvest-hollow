@@ -48,10 +48,10 @@ test('musicContext: title > fair > Golden Hour > rain > night > dusk > day', () 
 
 test('the pool per scene: every scene has music, the everyday scenes at least two tracks', () => {
   assert.deepEqual(ids(musicPool(TRACKS, 'title')), ['title-menu']);
-  assert.deepEqual(ids(musicPool(TRACKS, 'day')), ['day-sunflowers', 'day-river', 'day-fishing']);
-  assert.deepEqual(ids(musicPool(TRACKS, 'evening')), ['day-sunflowers', 'evening-lake']);
-  assert.deepEqual(ids(musicPool(TRACKS, 'night')), ['night-meadow', 'rain-inn']);
-  assert.deepEqual(ids(musicPool(TRACKS, 'rain')), ['night-meadow', 'rain-inn']);
+  assert.deepEqual(ids(musicPool(TRACKS, 'day')), ['day-morning', 'day-afternoon']);
+  assert.deepEqual(ids(musicPool(TRACKS, 'evening')), ['day-afternoon', 'evening-dusk']);
+  assert.deepEqual(ids(musicPool(TRACKS, 'night')), ['evening-dusk', 'night-lullaby', 'rain-inn']);
+  assert.deepEqual(ids(musicPool(TRACKS, 'rain')), ['night-lullaby', 'rain-inn']);
   assert.deepEqual(ids(musicPool(TRACKS, 'fair')), ['fair-minstrel']);
   // day, evening, night and rain follow each other all session: two or more each, so "never twice in a row" never
   // has to borrow another scene's music
@@ -80,16 +80,18 @@ test('pickTrack: deterministic for an injected random, and stays in its own pool
     const rnd = seeded(seed);
     let last = null;
     const out = [];
-    for (let i = 0; i < 40; i++) { last = pickTrack(TRACKS, 'day', { last, random: rnd }).id; out.push(last); }
+    // the night has three tracks (two would leave "never twice in a row" no choice to make)
+    for (let i = 0; i < 40; i++) { last = pickTrack(TRACKS, 'night', { last, random: rnd }).id; out.push(last); }
     return out;
   };
   assert.deepEqual(run(42), run(42));
   assert.notDeepEqual(run(42), run(43));
-  assert.ok(run(42).every((id) => id.startsWith('day-')));
+  const night = ids(musicPool(TRACKS, 'night'));
+  assert.ok(run(42).every((id) => night.includes(id)));
   // the random value picks by position in the pool, the last one excluded
-  assert.equal(pickTrack(TRACKS, 'day', { last: 'day-river', random: () => 0 }).id, 'day-sunflowers');
-  assert.equal(pickTrack(TRACKS, 'day', { last: 'day-river', random: () => 0.999 }).id, 'day-fishing');
-  assert.equal(pickTrack(TRACKS, 'night', { last: 'night-meadow', random: () => 0 }).id, 'rain-inn');
+  assert.equal(pickTrack(TRACKS, 'night', { last: 'night-lullaby', random: () => 0 }).id, 'evening-dusk');
+  assert.equal(pickTrack(TRACKS, 'night', { last: 'night-lullaby', random: () => 0.999 }).id, 'rain-inn');
+  assert.equal(pickTrack(TRACKS, 'day', { last: 'day-morning', random: () => 0.5 }).id, 'day-afternoon');
 });
 
 test('pickTrack: a scene with one track borrows from its fallback rather than repeat it', () => {
@@ -103,13 +105,13 @@ test('pickTrack: a scene with one track borrows from its fallback rather than re
 test('pickTrack: failed tracks are skipped, and with nothing left the generative engine plays (null)', () => {
   const rnd = seeded(3);
   for (let i = 0; i < 200; i++) {
-    const t = pickTrack(TRACKS, 'day', { failed: ['day-river', 'day-fishing'], random: rnd });
-    assert.equal(t.id, 'day-sunflowers');
+    const t = pickTrack(TRACKS, 'day', { failed: ['day-morning'], random: rnd });
+    assert.equal(t.id, 'day-afternoon');
   }
   // every day track failed: the day borrows from the evening
-  assert.equal(pickTrack(TRACKS, 'day', { failed: ['day-sunflowers', 'day-river', 'day-fishing'], random: () => 0 }).id, 'evening-lake');
+  assert.equal(pickTrack(TRACKS, 'day', { failed: ['day-morning', 'day-afternoon'], random: () => 0 }).id, 'evening-dusk');
   // the only fitting track just played and the other failed: nothing left -> null -> a generative piece
-  assert.equal(pickTrack(TRACKS, 'day', { last: 'evening-lake', failed: ['day-sunflowers', 'day-river', 'day-fishing'] }), null);
+  assert.equal(pickTrack(TRACKS, 'day', { last: 'evening-dusk', failed: ['day-morning', 'day-afternoon'] }), null);
   assert.equal(pickTrack(TRACKS, 'fair', { failed: ids(TRACKS) }), null);
   assert.equal(pickTrack([], 'day'), null, 'no track list at all');
   // failed accepts any iterable (the director passes an array; a Set works too)
@@ -125,7 +127,7 @@ test('musicFormats: Ogg Vorbis first, AAC for Safari, nothing when neither plays
   assert.deepEqual(musicFormats(() => { throw new Error('no media'); }), []);
 });
 
-test('tracks.json: every entry is complete, unique and credited to a CC0 source page', () => {
+test('tracks.json: every entry is complete, unique and credited to its licence terms', () => {
   assert.ok(TRACKS.length >= 6 && TRACKS.length <= 10, `${TRACKS.length} tracks`);
   assert.equal(new Set(ids(TRACKS)).size, TRACKS.length, 'unique ids');
   assert.equal(new Set(TRACKS.map((t) => t.file)).size, TRACKS.length, 'unique files');
@@ -133,9 +135,10 @@ test('tracks.json: every entry is complete, unique and credited to a CC0 source 
     assert.match(t.id, /^[a-z0-9-]+$/, t.id);
     assert.match(t.file, /^[a-z0-9-]+$/, t.id);
     for (const k of ['title', 'artist', 'by']) assert.ok(typeof t[k] === 'string' && t[k].trim(), `${t.id}.${k}`);
-    assert.match(t.url, /^https:\/\/opengameart\.org\/content\/[a-z0-9-]+$/, `${t.id}.url`);
-    assert.equal(t.licence, 'CC0', `${t.id}.licence`);
-    assert.equal(t.licenceUrl, 'https://creativecommons.org/publicdomain/zero/1.0/');
+    // generated for the game with the ElevenLabs Music API (2026-11-23), used under the ElevenLabs Music Terms
+    assert.equal(t.url, 'https://elevenlabs.io/music-terms', `${t.id}.url`);
+    assert.equal(t.licence, 'ElevenLabs Music Terms', `${t.id}.licence`);
+    assert.equal(t.licenceUrl, 'https://elevenlabs.io/music-terms');
     assert.match(t.verified, /^\d{4}-\d{2}-\d{2}$/, `${t.id}.verified`);
     assert.ok(t.moods.length && t.moods.every((m) => MUSIC_CONTEXTS.includes(m)), `${t.id}.moods`);
     assert.ok(Number.isFinite(t.gain) && t.gain > 0 && t.gain <= 2, `${t.id}.gain`);
