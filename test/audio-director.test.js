@@ -121,12 +121,12 @@ test('a borrowed track plays on: the title tune and the Fair\'s one dance are ne
   audio.unlock();
   await advance(3);
   await advance(0.5);
-  assert.equal(audio.info().music.track, 'title-menu');
+  assert.equal(audio.info().music.track, 'hollow-morning');
   playing().finish();
   await advance(61);                                           // the 30-60 s rest
   await advance(0.3);
   const borrowed = audio.info().music;
-  assert.notEqual(borrowed.track, 'title-menu', 'the title tune does not play twice in a row');
+  assert.notEqual(borrowed.track, 'hollow-morning', 'the title tune does not play twice in a row');
   assert.ok(borrowed.track, 'a track from the day borrowed for the title screen');
   for (let i = 0; i < 6; i++) await advance(0.5);              // well past the 4 s cross-fade
   assert.equal(audio.info().music.track, borrowed.track, 'the borrowed track is kept');
@@ -138,11 +138,11 @@ test('a borrowed track plays on: the title tune and the Fair\'s one dance are ne
   audio.festive();
   await advance(3);
   await advance(0.3);
-  assert.equal(audio.info().music.track, 'fair-minstrel');
+  assert.equal(audio.info().music.track, 'lantern-fair');
   audio.festive();
   await advance(3);
   for (let i = 0; i < 6; i++) await advance(0.5);
-  assert.notEqual(audio.info().music.track, 'fair-minstrel', 'not the dance twice in a row');
+  assert.notEqual(audio.info().music.track, 'lantern-fair', 'not the dance twice in a row');
   assert.ok(noRepeats(plays), `no track twice in a row: ${plays.join(' > ')}`);
   assert.ok(plays.length <= 5, `no stream churn: ${plays.join(' > ')}`);
   audio.setScene({ title: null });

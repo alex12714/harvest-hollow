@@ -106,7 +106,7 @@ export default {
   'settings.credits.now': 'Playing now',
   'settings.credits.failed': 'The music list could not be loaded just now. Open this tab again in a moment.',
   'settings.credits.music': 'Music',
-  'settings.credits.musicLead': 'The music is real, composed acoustic and folk music, shared by its artists with everyone. Thank you!',
+  'settings.credits.musicLead': 'The background music was generated for Harness Hollow with ElevenLabs Music: soft, calm ambient tracks that sit under the farm.',
   'settings.credits.sounds': 'Sounds',
   'settings.credits.soundsLead': 'The sound effects are synthesised for Harness Hollow (no recordings), and the stand-in music that plays when a track cannot load is composed note by note in your browser.',
   'settings.mood.title': 'Title screen',

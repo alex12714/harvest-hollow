@@ -104,7 +104,7 @@ export default {
   'settings.credits.now': 'Свири сега',
   'settings.credits.failed': 'Списъкът с музика не се зареди. Отвори този раздел пак след малко.',
   'settings.credits.music': 'Музика',
-  'settings.credits.musicLead': 'Музиката е истинска: акустична и фолк музика, която авторите ѝ споделят с всички. Благодарим!',
+  'settings.credits.musicLead': 'Фоновата музика е създадена за Harness Hollow с ElevenLabs Music: меки, спокойни амбиентни парчета, които звучат тихо под фермата.',
   'settings.credits.sounds': 'Звуци',
   'settings.credits.soundsLead': 'Звуковите ефекти са синтезирани за Harness Hollow (без записи), а резервната музика, която свири, когато парче не се зареди, се композира нота по нота в браузъра ти.',
   'settings.mood.title': 'Начален екран',
