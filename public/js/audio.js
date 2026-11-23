@@ -5,8 +5,8 @@
 // tools/make-sfx.mjs (public/assets/audio/*.ogg, Opus, with *.wav as the per-file fallback, + manifest.json). Owned by
 // the client lane.
 //
-// Music director (owner request 2026-10-04: "improve the music to be not so much generic"). Composed CC0 acoustic and
-// folk tracks (public/assets/audio/music/: tracks.json is the one list the director and Settings > Credits read;
+// Music director (owner request 2026-10-04: "improve the music to be not so much generic"). Ambient background
+// tracks generated with ElevenLabs Music (public/assets/audio/music/: tracks.json is the one list the director and Settings > Credits read;
 // CREDITS.md says where each came from and how the files were made). The director:
 //   - picks a scene (musicContext: title > fair > evening (Golden Hour) > rain > night > evening (dusk) > day), then a
 //     track from that scene's pool (pickTrack: never the track that just played, never a failed one; a pool with
@@ -60,7 +60,7 @@
 //                                            ('pending' while the track list loads)
 //   audio.force(variant | null, { generative?, trace?, ahead? })   dev/test: pin the music scene ('day' 'evening'
 //                                            'night' 'rain' 'fair' 'title'; 'golden' = 'evening') or one track by id
-//                                            ('rain-inn') and start it now; generative / trace / ahead: the generative
+//                                            ('rain-hush') and start it now; generative / trace / ahead: the generative
 //                                            engine with that variant ('day' 'night' 'golden' 'fair'); null: follow
 //                                            the scene again
 //   audio.record(seconds)                    dev/test: capture the master output

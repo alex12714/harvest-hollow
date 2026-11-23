@@ -233,8 +233,9 @@ start. Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 - 3D models: [Quaternius](https://quaternius.com), [Kenney](https://kenney.nl) and
   [vertexcat](https://vertexcat.itch.io) (CC0) — the packs are listed in
   [`public/assets/models/CREDITS.md`](public/assets/models/CREDITS.md).
-- Music: CC0 tracks from [OpenGameArt](https://opengameart.org) by Komiku, Memoraphile, Écrivain, Indieteur and
-  RandomMind — details in [`public/assets/audio/music/CREDITS.md`](public/assets/audio/music/CREDITS.md).
+- Music: ambient background tracks generated for the game with ElevenLabs Music, used under the
+  [ElevenLabs Music Terms](https://elevenlabs.io/music-terms) — prompts, processing and details in
+  [`public/assets/audio/music/CREDITS.md`](public/assets/audio/music/CREDITS.md).
 - Fonts: Fredoka, Baloo 2 and Nunito (SIL Open Font License 1.1; the licence texts are in `public/assets/fonts/`).
 - Illustrated portraits, letter headers, backdrops and the logo: original art made for this game with an AI image
   model (Higgsfield), checked image by image and post-processed; released under the MIT licence with the code.
