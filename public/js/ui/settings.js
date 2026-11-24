@@ -17,6 +17,7 @@ import { assetUrl } from '../net/asset-base.js';
 import { h, kv } from './dom.js';
 import { LAYOUT_Q } from './layout.js';
 import { farmName } from '../../../shared/brand.js';
+import { SPEEDS, speedKey } from '../game/speed.js';
 import { t, liveRows, live, lang, setLang, LANGS, LANG_NAMES, fmtPct } from '../i18n/index.js';
 
 const KEY = 'hh.settings';
@@ -368,6 +369,35 @@ export function createSettings(S) {
     ];
   }
 
+  /**
+   * Settings › Farm › Game speed (OnFire): how fast the farm's time runs (crops, animals, workshops, the sky). The farm's
+   * owner picks it (game/speed.js asks the server, which checks and tells everyone); the other farmers see it, greyed.
+   */
+  function speedRows() {
+    const sp = S.controller?.speed;
+    if (!sp) return [];
+    const row = h('div.set-row.set-speed', h('span.lbl', { id: 'set-speed' }, t('settings.speed')));
+    const group = h('div.seg', { role: 'group', 'aria-labelledby': 'set-speed' });
+    const help = h('span.help');
+    const paint = () => {
+      const can = sp.canSet();
+      for (const b of group.children) {
+        b.setAttribute('aria-pressed', String(Number(b.dataset.v) === sp.speed()));
+        b.disabled = !can;
+      }
+      const owner = S.store.state?.players?.[sp.owner()]?.name ?? '';
+      help.textContent = can ? t('settings.speed.help') : t('settings.speed.ownerHelp', { name: owner });
+    };
+    for (const v of SPEEDS) {
+      group.append(h('button', { type: 'button', dataset: { v: String(v) }, on: { click: () => { sp.set(v); } } }, t(speedKey(v))));
+    }
+    // repaint on every clock change while the panel shows; the first change after it closed unsubscribes
+    const off = sp.on(() => { if (!row.isConnected) off(); else paint(); });
+    paint();
+    row.append(group, help);
+    return [h('h3', t('settings.speed.title')), row];
+  }
+
   /** Language (i18n): the two languages in their own words; a tap switches the whole game at once (ui/index.js relocalize). */
   function langRow() {
     const row = h('div.set-row.set-lang', h('span.lbl', { id: 'set-lang' }, t('lang.label')));
@@ -448,6 +478,7 @@ export function createSettings(S) {
           h('div.set-row', h('span.lbl', t('settings.farm.guide')), h('div',
             h('button.btn.btn--paper.btn--small', { type: 'button', dataset: { guide: 'again' }, on: { click: () => { ctx.close(); S.tutorial?.restart(); } } }, t('settings.farm.guideAgain'))),
           h('span.help', t('settings.farm.guideHelp'))),
+          ...speedRows(),
           ...(S.ui.panels.has('avatar') ? [h('div.set-row', h('span.lbl', t('settings.farm.farmer')), h('div',
             h('button.btn.btn--sky.btn--small', { type: 'button', dataset: { look: 'open' }, on: { click: () => { ctx.close(); S.ui.panels.open('avatar'); } } }, t('settings.farm.look'))),
           h('span.help', t('settings.farm.lookHelp')))] : []),

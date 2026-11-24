@@ -3,9 +3,10 @@
 // arguments and return shapes below stay stable. Units: rule TILES at this boundary (floats allowed for
 // presence); metres only inside render/ (TILE_M).
 //
-//   view.init(canvas, { quality?, now, overlay }) -> Promise<void>
+//   view.init(canvas, { quality?, now, realNow?, overlay }) -> Promise<void>
 //        quality: 'high'|'medium'|'low'|'auto' (default 'high'; a remembered auto-settled tier wins over the
-//        default); now(): estimated server epoch ms (ClockSync); overlay: a DOM element above the canvas
+//        default); now(): estimated server epoch ms (ClockSync); realNow(): its real-time twin (presence, wander;
+//        differs at a game speed other than 1x); overlay: a DOM element above the canvas
 //   view.setState(state, { me })      after every welcome: (re)build everything from the replicated state
 //   view.sync(ids, topics)            after each store 'change': re-read only these object ids / topics
 //   view.pick(ndc) -> { kind: 'object'|'tile', id?, x, z, px, pz, land?, expansion? } | null
@@ -318,7 +319,7 @@ function fingerTarget(q) {
 }
 
 export const view = {
-  async init(canvas, { quality = 'high', now = () => Date.now(), overlay = document.body } = {}) {
+  async init(canvas, { quality = 'high', now = () => Date.now(), realNow = now, overlay = document.body } = {}) {
     // R3-01: a lost manifest (assets.js warns) is asked for again by models.js; _lateManifest re-syncs when it comes
     try { await models.init(); } catch { /* said by assets.js */ }
     initIcons().catch(() => {});
@@ -374,7 +375,8 @@ export const view = {
     const life = createAmbientLife(layers, { now, overlay });
     const avatars = createAvatarsView(layers, overlay, (x, z, y) => toScreenM(x * TILE_M, z * TILE_M, y));
     call(avatars, 'setNow', now);
-    const animals = createAnimalsView(layers, overlay, toScreenM, { now });
+    call(avatars, 'setRealNow', realNow);      // presence rows carry real server time (game speed)
+    const animals = createAnimalsView(layers, overlay, toScreenM, { now, realNow });
     const fx = createFx(layers.fx, overlay, toScreenM);
     // wave 4 (owner wish 10): the bird baths' water ripples and their visitors (one instanced draw for all of them)
     const baths = createBirdBaths({ layer: layers.fx, fx });

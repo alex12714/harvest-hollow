@@ -53,6 +53,7 @@ export function worldSessions(world) {
       const msg = {
         t: MSG.WELCOME, proto: PROTOCOL_VERSION, pid: null, visitor: { seat: conn.visitor.seat, name: conn.visitor.name }, owner,
         state: redactState(this.state), v: this.engine.v, serverNow: this.clock.now(), lastSeq: 0, known: true, rejected: [],
+        ...this.clockFacts(),
         // the farmers' chat and private text stay theirs (redact.js; 05-valley-map.md, privacy)
         contentHash: CONTENT_HASH, rulesVersion: RULES_VERSION, peers: this.peers(null), chat: [],
       };
@@ -71,7 +72,7 @@ export function worldSessions(world) {
           }
           return undefined;
         case MSG.PING:
-          if (take('ping')) this.send(conn, { t: MSG.PONG, c: m.c, s: this.clock.now() }, true);
+          if (take('ping')) this.send(conn, { t: MSG.PONG, c: m.c, s: this.clock.now(), r: this.clockFacts().realNow }, true);
           return undefined;
         case MSG.RESYNC:
           if (take('resync')) this.visitWelcome(conn);

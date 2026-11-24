@@ -24,6 +24,7 @@ import { worldTag } from './registry.js';
 import { WindowLimiter } from '../ip-limits.js';
 import { farmThumb } from './thumb.js';
 import { stateOf } from './valley.js';
+import { gameAt, cleanRate } from '../clock.js';
 
 const NO_STORE = 'no-store';
 const MEMBER_KEY_RE = /^[A-Za-z0-9_-]{16,256}$/;
@@ -41,10 +42,18 @@ const CODES = { AUTH: 401, NOT_FOUND: 404, CALL: 409, FULL: 503, UNAVAILABLE: 50
  * at least every 30 s while it changes and when it unloads), read once per change of the file and cached. Null when
  * neither can be read.
  */
+/** A sleeping farm's game time from its saved clock sidecar ({ devOffset, rate }): the wall at the farm's speed. */
+export function snapGameNow(server, wall) {
+  const c = server && server.clock;
+  if (!c) return wall;
+  const real = Math.max(wall + (Number.isSafeInteger(c.devOffset) ? c.devOffset : 0), Number.isFinite(c.lastNow) ? c.lastNow : 0);
+  return gameAt(cleanRate(c.rate), real);
+}
 const snapThumbs = new Map();                  // farmId -> { mtimeMs, thumb }
 export function thumbOf(rec, now = Date.now()) {
   const live = stateOf(rec);
-  if (live) return farmThumb(live, now);
+  // crops ripen in the farm's GAME time (its owner's game speed, server/clock.js), not the wall clock
+  if (live) return farmThumb(live, rec.hh.clock ? rec.hh.clock.now() : now);
   const file = path.join(rec.dir, 'farm.json');
   let st;
   try { st = fs.statSync(file); } catch { return null; }
@@ -53,7 +62,8 @@ export function thumbOf(rec, now = Date.now()) {
   try {
     const snap = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (!snap || !snap.state || !snap.state.farm) return had?.thumb ?? null;
-    const thumb = farmThumb(snap.state, now);               // crops ripen with time: recomputed at most once a minute
+    // crops ripen with time (the farm's game time at its speed): recomputed at most once a minute
+    const thumb = farmThumb(snap.state, snapGameNow(snap.server, now));
     snapThumbs.set(rec.id, { mtimeMs: st.mtimeMs, at: now, thumb });
     if (snapThumbs.size > 4096) snapThumbs.delete(snapThumbs.keys().next().value);
     return thumb;

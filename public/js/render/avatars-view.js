@@ -415,6 +415,8 @@ export function createAvatarsView(layers, overlay, toScreen) {
   const av = new Map();
   let myPid = null;
   let now = () => 0;
+  /** presence time (real server time: OnFire game speed never speeds up a walk); the game clock without it */
+  let realNow = null;
   let fx = null;
   let motion = 'full';
   let locateTarget = () => null;
@@ -1498,10 +1500,11 @@ export function createAvatarsView(layers, overlay, toScreen) {
     clock += dt;
     let want = 0;
     const t = now();
+    const tp = realNow ? realNow() : t;
     const gk = goldenK(t);
     for (const a of av.values()) {
       if (!a.self && a.online) {
-        const p = a.buf.at(t);
+        const p = a.buf.at(tp);
         if (p) {
           if (a.pose && Math.abs(a.pose.x - p.x) + Math.abs(a.pose.z - p.z) > 1e-3) want = Math.max(want, WANT.MOVING);
           placeRoot(a, { x: p.x, z: p.z, f: p.f, a: p.a });
@@ -1646,6 +1649,7 @@ export function createAvatarsView(layers, overlay, toScreen) {
 
   return {
     setNow(fn) { now = fn; },
+    setRealNow(fn) { realNow = fn; },
     setFx(f) { fx = f; },
     /** The sky (wave 4, render/index.js): pets sleep from late dusk to dawn. `sky` = { phase, k } (daynight.js). */
     setNight(night, sky = null) { petNight = sky && sky.phase ? petsAsleep(sky.phase, sky.k, petNight) : night > 0.6; },

@@ -101,12 +101,23 @@ export const MSG = Object.freeze({
   // client -> server
   HELLO: 'hello', ACT: 'act', ACTS: 'acts', PING: 'ping', MV: 'mv', GHOST: 'ghost',
   EMOTE: 'emote', MARK: 'mark', CHAT: 'chat', RESYNC: 'resync',
+  // client -> server, additive (OnFire): the farm owner sets the game speed { speed } (one of SPEEDS)
+  SPEED: 'speed',
   // server -> client
   SLOTS: 'slots', DENY: 'deny', WELCOME: 'welcome', DELTA: 'd', REJ: 'rej', ACK: 'ack', PONG: 'pong',
   PRESENCE: 'pr', PEER: 'peer', BATCH: 'b',
   // server -> client, additive (Harness Hollow)
   HX: 'hx',
+  // server -> client, additive (OnFire): the farm's game clock changed { rate, realNow, serverNow, by }, or a refused
+  // speed change answered to its sender only (+ code: 'OWNER_ONLY')
+  CLOCK: 'clock',
 });
+
+/**
+ * The game speeds a farm may run at (server/clock.js): game time = real time x speed from the owner's last change.
+ * 1 = real time, the default of every farm.
+ */
+export const SPEEDS = Object.freeze([0.5, 1, 2, 4]);
 
 /** Client capabilities announced in `hello.caps` (additive; unknown ones are ignored). */
 export const CAPS = Object.freeze({ BATCH: 'b' });
@@ -170,6 +181,7 @@ export const LIMITS = Object.freeze({
     act: Object.freeze([120, 360]), mv: Object.freeze([20, 20]), ghost: Object.freeze([12, 12]), hop: Object.freeze([1, 2]),
     chat: Object.freeze([2, 5]), mark: Object.freeze([1, 1]), emote: Object.freeze([1, 1]),
     ping: Object.freeze([5, 10]), hello: Object.freeze([1, 5]), resync: Object.freeze([0.2, 2]),
+    speed: Object.freeze([1, 3]),
     // every frame of any kind: far above a correct client (one acts frame per animation frame + 15 mv + 10 ghost
     // + pings), so only a flood hits it; frames over it count as abuse
     frame: Object.freeze([300, 600]),
@@ -309,6 +321,8 @@ export function parseClientMessage(msg) {
       }
       case MSG.RESYNC:
         return { t: MSG.RESYNC };
+      case MSG.SPEED:
+        return SPEEDS.includes(msg.speed) ? { t: MSG.SPEED, speed: msg.speed } : null;
       default:
         return null;
     }

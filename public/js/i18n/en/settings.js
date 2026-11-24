@@ -100,6 +100,18 @@ export default {
   'settings.farm.switch': 'Switch farmer',
   'settings.farm.switchHelp': 'Pick the other farmer on this device (two tabs can be both of you).',
 
+  // OnFire: the farm's game speed (Settings › Farm; game/speed.js)
+  'settings.speed.title': 'Game speed',
+  'settings.speed': 'Speed',
+  'settings.speed.x0_5': '0.5×',
+  'settings.speed.x1': '1×',
+  'settings.speed.x2': '2×',
+  'settings.speed.x4': '4×',
+  'settings.speed.help': 'How fast time runs on your farm: crops, animals, workshops, day and night. Everyone on the farm plays at this speed.',
+  'settings.speed.ownerHelp': '{name} owns this farm and sets its speed.',
+  'settings.speed.ownerOnly': 'Only the farm\'s owner can change the game speed.',
+  'settings.speed.changed': '{name} set the game speed to {speed}.',
+
   'settings.credits.loading': 'Loading the music list…',
   'settings.credits.tracks': 'Music tracks',
   'settings.credits.by': 'by {artist}',

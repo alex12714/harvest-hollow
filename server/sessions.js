@@ -332,6 +332,7 @@ export class Sessions {
     const msg = {
       t: MSG.WELCOME, proto: PROTOCOL_VERSION, pid: conn.pid, state: this.state, v: this.engine.v,
       serverNow: this.clock.now(), lastSeq: rec ? rec.lastSeq : 0, known, rejected: this.engine.rejectedOf(conn.cid),
+      ...this.clockFacts(),
       // contentHash covers content + config + RULES_VERSION; rulesVersion alone lets a stale tab tell a client-only
       // deploy (same rules: re-send what it predicted during the restart, then reload) from a rules change
       // (remember it and say it was not saved): qa2 SV-01 / CL-02
@@ -342,6 +343,43 @@ export class Sessions {
     const mod = this.modOf();
     if (mod) msg.mod = mod;
     this.send(conn, msg, true);
+  }
+
+  /**
+   * The game clock for the wire (additive, OnFire game speed): `realNow` seeds the client's real-time estimate
+   * (ClockSync, presence) and `rate` maps it to game time; rate null = game time is real time.
+   */
+  clockFacts() {
+    const c = this.clock;
+    return { realNow: typeof c.real === 'function' ? c.real() : c.now(), rate: typeof c.rate === 'function' ? c.rate() : null };
+  }
+
+  /** The farm's owner (the first farmer, p1: the creator in multi and world mode), or null on an empty farm. */
+  ownerPid() { return Object.keys(this.state.players).sort()[0] ?? null; }
+
+  /**
+   * The owner sets the farm's game speed (protocol SPEEDS; the parser already refused anything else). Everyone on the
+   * farm, visitors too, hears the new clock; anyone else is answered the unchanged clock with code OWNER_ONLY.
+   * Returns true when the speed changed (the caller re-arms the system timer).
+   */
+  setSpeed(conn, speed) {
+    if (!conn.pid || typeof this.clock.setSpeed !== 'function') return false;
+    if (conn.pid !== this.ownerPid()) {
+      this.send(conn, { t: MSG.CLOCK, ...this.clockFacts(), serverNow: this.clock.now(), code: 'OWNER_ONLY' });
+      return false;
+    }
+    if (this.clock.speed === speed) {
+      this.send(conn, { t: MSG.CLOCK, ...this.clockFacts(), serverNow: this.clock.now(), by: conn.pid });
+      return false;
+    }
+    this.engine.runDue();                        // what came due at the old speed is settled at the old speed
+    this.clock.setSpeed(speed);
+    this.engine.dirty = true;
+    this.log.info('game speed set', { pid: conn.pid, speed });
+    this.broadcast({ t: MSG.CLOCK, ...this.clockFacts(), serverNow: this.clock.now(), by: conn.pid });
+    // the anchor lives in the sidecar: write it now, so a crash cannot bring the old speed back
+    Promise.resolve(this.save()).catch((err) => this.log.error('saving the game speed failed', err));
+    return true;
   }
 
   close(conn) {

@@ -131,7 +131,7 @@ export class Socket {
       for (const m of list) {
         if (!m || typeof m !== 'object') continue;
         // The clock sample is taken at receipt, never deferred to the next animation frame (main.js inbox).
-        if (m.t === MSG.PONG) this.clock.add(m.c, m.s, performance.now());
+        if (m.t === MSG.PONG) this.clock.add(m.c, typeof m.r === 'number' ? m.r : m.s, performance.now());   // r: real time (game speed)
         if (m.t === MSG.WELCOME) { this.welcomed = true; this.startPings(); }
         this.onMessage(m);
       }

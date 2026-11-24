@@ -31,13 +31,14 @@ let owner = null;
 
 function onWelcome(w) {
   if (!w.visitor) { say(t('world.unavailable')); socket.stop(); return; }
-  clock.seed(w.serverNow, performance.now());
+  clock.seed(Number.isFinite(w.realNow) ? w.realNow : w.serverNow, performance.now());
+  clock.setRate(w.rate ?? null);                         // the farm's game speed (OnFire): its crops grow at its pace
   store.reset(w);
   owner = w.owner;
   view.setState(store.state, { me: `visitor:${w.visitor.seat}` });
   for (const p of w.peers || []) {
     view.partner.online(p.pid, p.online);
-    if (p.pose) view.partner.update([p.pose], w.serverNow);
+    if (p.pose) view.partner.update([p.pose], w.realNow ?? w.serverNow);
   }
   const name = (owner && store.state.players[owner]?.name) || '';
   say(t('world.lookOnly', { name }));
@@ -82,6 +83,7 @@ function handle(m) {
     case MSG.GHOST: return view.partner.ghost(m.pid, m.g);
     case MSG.EMOTE: return view.emote?.(m.pid, m.id);
     case MSG.MARK: return view.ping?.(m.pid, m.x, m.z);
+    case MSG.CLOCK: clock.setRate(m.rate ?? null); return view.invalidate?.();
     default: return undefined;
   }
 }
@@ -122,7 +124,7 @@ async function boot() {
   mountWorldStrip({ homeId, here: farmId, onMap: () => import('./valley-map.js').then((m) => m.openValleyMap({ homeId, here: farmId })) });
   say(t('world.connecting'));
   const canvas = document.getElementById('world');
-  await view.init(canvas, { quality: 'auto', now: serverNow, overlay: document.getElementById('overlay') });
+  await view.init(canvas, { quality: 'auto', now: serverNow, realNow: () => clock.realNow(performance.now()), overlay: document.getElementById('overlay') });
   store.on('change', (ch) => view.sync(ch.ids, ch.topics));
   store.on('fx', ({ ev, by, local }) => view.fx.play(ev, undefined, { by, local }));
   cameraInput(canvas);

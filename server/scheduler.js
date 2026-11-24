@@ -12,6 +12,8 @@
 //   - When something is still due right after runDue(), it is a stuck type backing off in the engine
 //     (engine.STUCK_MS): the timer waits for the back-off instead of spinning at 0 ms. If nothing is stuck, the
 //     rules' two functions disagree at a boundary: re-check in a second (logged once), never an hour later.
+//   - At a game speed other than 1x the delay is game ms: setTimeout waits clock.realDelay(delay) real ms, and the
+//     owner's speed change re-arms (sessions.setSpeed).
 //   - The midnight rollover uses the farm's zone (state.meta.tz = HH_TZ, default the machine's zone).
 //
 // Autosave: every snapshotMs when something changed, and also while anyone is online (SV-01, SV-07): each snapshot
@@ -119,9 +121,11 @@ export class Scheduler {
     }
     const delay = Math.min(Math.max(due - now, 0), MAX_DELAY);
     this.dueAt = now + delay;
+    // Game ms -> real ms at the farm's speed (server/clock.js; a clock without speeds is real time).
+    const wait = typeof this.clock.realDelay === 'function' ? this.clock.realDelay(delay) : delay;
     // +1 ms: Node timers may fire up to a millisecond early against the floored game clock, which would cost a
     // second wake-up for nothing.
-    this.timer = setTimeout(() => this.fire(), delay ? delay + 1 : 0);
+    this.timer = setTimeout(() => this.fire(), wait ? wait + 1 : 0);
     this.timer.unref?.();
   }
 

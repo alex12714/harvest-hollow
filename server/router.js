@@ -20,6 +20,8 @@ const ABUSE_MAX = 300;          // abusive frames per window before the socket i
 /** Pings and ghosts outside this margin around the world are garbage, not "clamp me". */
 const MARGIN = 16;
 
+/** Real (wall-rate) server time: server/clock.js real(), or now() for a clock without game speed. */
+export const realOf = (clock) => (typeof clock.real === 'function' ? clock.real() : clock.now());
 const round05 = (n) => Math.round(n * 20) / 20;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const inWorld = (n) => n >= -MARGIN && n <= WORLD_TILES + MARGIN;
@@ -104,7 +106,12 @@ export function handleMessage(hh, conn, raw) {
       }
       case MSG.PING:
         if (!take('ping')) return abuse(hh, conn);
-        return hh.sessions.send(conn, { t: MSG.PONG, c: m.c, s: hh.clock.now() }, true);
+        // s: game time (older clients); r: real time, what the client's estimate tracks (OnFire game speed)
+        return hh.sessions.send(conn, { t: MSG.PONG, c: m.c, s: hh.clock.now(), r: realOf(hh.clock) }, true);
+      case MSG.SPEED:
+        if (!take('speed')) return undefined;
+        if (hh.sessions.setSpeed(conn, m.speed)) hh.scheduler?.requestArm();
+        return undefined;
       case MSG.MV:
         // A hop (a poof, tech §6.5) has its own small bucket; over it, the hop is relayed as a clamped walk.
         if (m.hop && !take('hop')) delete m.hop;

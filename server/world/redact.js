@@ -8,14 +8,14 @@
 //   - the activity logs are sent as empty containers, and writes into them are dropped: farm.ledger.rows (who sold
 //     what, when) and farm.memory.rows (the Memory Book's pages)
 //   - chat is never sent to a visitor (server/world/sessions.js), and only these frames go to one at all:
-//     delta (redacted), presence, peer, emote, mark (VISITOR_FRAMES)
+//     delta (redacted), presence, peer, emote, mark, clock (VISITOR_FRAMES)
 // The containers stay (an op that writes inside one would otherwise find no parent on the visitor's store), and keys
 // stay in place, so the client's store applies every delta it gets exactly as the farmers' stores do.
 import { MSG } from '../../shared/net/protocol.js';
 
 export const PRIVATE_KEYS = new Set(['text', 'note', 'message', 'msg']);
 export const DROPPED = [['farm', 'ledger', 'rows'], ['farm', 'memory', 'rows']];
-export const VISITOR_FRAMES = new Set([MSG.DELTA, MSG.PRESENCE, MSG.PEER, MSG.EMOTE, MSG.MARK]);
+export const VISITOR_FRAMES = new Set([MSG.DELTA, MSG.PRESENCE, MSG.PEER, MSG.EMOTE, MSG.MARK, MSG.CLOCK]);
 
 const same = (a, b) => a.length === b.length && a.every((x, i) => String(x) === String(b[i]));
 const under = (p, root) => p.length > root.length && root.every((x, i) => String(p[i]) === String(x));

@@ -587,12 +587,14 @@ function ringTexture(step) {
   return t;
 }
 
-export function createAnimalsView(layers, overlay, toScreenM, { now: nowFn } = {}) {
+export function createAnimalsView(layers, overlay, toScreenM, { now: nowFn, realNow: realFn } = {}) {
   void overlay;
   // D4: the name tags (a DOM layer of their own, #name-tags under the HUD), placed from update()
   const tags = createNameTags({ toScreenM: typeof toScreenM === 'function' ? toScreenM : () => ({ x: 0, y: 0, visible: false }) });
   const tagList = [];
   let now = nowFn || (() => Date.now());
+  // wander paths run on real time (OnFire game speed): a farm at 4x grows faster, its animals do not scurry
+  const realNow = realFn || (() => now());
   let state = null;
   let fx = null;
   let motion = 'full';
@@ -1059,6 +1061,7 @@ export function createAnimalsView(layers, overlay, toScreenM, { now: nowFn } = {
       return 0;
     }
     const t = now();
+    const tw = realNow();
     const asleep = night > 0.5;
     // horses out with a rider stay out of the stable (the first adult horses by id, one per rider)
     let riders = 0; for (const on of RIDERS.values()) if (on) riders++;
@@ -1117,10 +1120,10 @@ export function createAnimalsView(layers, overlay, toScreenM, { now: nowFn } = {
       if (io && io.p) { a.p = io.p; a.x = io.p.x; a.z = io.p.z; continue; }
       let p;
       if (asleep || st.eating || motion === 'still') p = { x: a.x || spot.x, z: a.z || spot.z, walking: false, face: a.face, speed: 0, phase: clock, seg: -1, since: 99 };
-      else if (a.def === 'duck' && home.water) p = pondPose(a.id, t, spot, yard, home.water, { speed });
-      else if (a.def === 'goat' && home.perches.length) p = climbPose(a.id, t, spot, yard, home.perches, { radius, speed });
-      else if (DUST_ROLLERS.has(a.def)) p = dustPose(a.id, t, spot, yard, home.dust, home.perches, { radius, speed });
-      else p = wanderPose(a.id, t, spot, yard, { radius, speed });
+      else if (a.def === 'duck' && home.water) p = pondPose(a.id, tw, spot, yard, home.water, { speed });
+      else if (a.def === 'goat' && home.perches.length) p = climbPose(a.id, tw, spot, yard, home.perches, { radius, speed });
+      else if (DUST_ROLLERS.has(a.def)) p = dustPose(a.id, tw, spot, yard, home.dust, home.perches, { radius, speed });
+      else p = wanderPose(a.id, tw, spot, yard, { radius, speed });
       // the horse show (wave 3): a horse entered trots laps of its yard while the show plays
       if (a.show && clock < a.show.until && !st.baby) {
         const [x0, z0, x1, z1] = yard;

@@ -185,7 +185,8 @@ export async function openFarm(cfg, { log, dir = cfg.dataDir, perf = null, stati
   const hh = { cfg, log, persist, engine, clock, parse: parseClientMessage, startedAt: Date.now(), perf: perf ?? new Perf() };
   hh.static = staticFiles ?? new StaticFiles({ root: cfg.root, log, basePath: cfg.basePath });   // BUILD_HASH: the game files this server serves
   // a farmer appears on the farmhouse porch wherever the couple moved the farmhouse (owner rule 2026-10-04)
-  hh.presence = new Presence(clock, (msg) => hh.sessions.presenceOut(msg), { spawnOf: (pid) => spawnAt(engine.state, pid) });
+  // presence (walking speed, interpolation) runs on real time whatever the farm's game speed (server/clock.js)
+  hh.presence = new Presence({ now: () => clock.real() }, (msg) => hh.sessions.presenceOut(msg), { spawnOf: (pid) => spawnAt(engine.state, pid) });
   // Together time not paid before the last snapshot, minus what the replayed lines paid since (SV-07).
   const saved = sidecar.live && sidecar.live.together;
   const savedAcc = saved && Number.isSafeInteger(saved.acc) ? saved.acc : 0;

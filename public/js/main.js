@@ -48,6 +48,7 @@ import { createFishingHud } from './game/fishing-hud.js';
 import { createModeChip } from './game/mode-chip.js';
 import { createM2Moments } from './game/m2-moments.js';
 import { ClockSync } from '../../shared/net/clock.js';
+import { createGameSpeed, speedKey } from './game/speed.js';
 import { makeCid } from '../../shared/net/ids.js';
 import { MSG, ERR, PROTOCOL_VERSION, CAPS, cleanName } from '../../shared/net/protocol.js';
 import { CONTENT_HASH, furnitureOf } from '../../shared/content/index.js';
@@ -109,8 +110,17 @@ let gated = false;
 const cid = makeCid((n) => crypto.getRandomValues(new Uint8Array(n)));   // not randomUUID: LAN pages are not secure contexts
 const clock = new ClockSync();
 const serverNow = () => clock.serverNow(performance.now());
+/** Real server time (presence, wander): serverNow() runs at the farm's game speed (OnFire, game/speed.js). */
+const realNow = () => clock.realNow(performance.now());
 let socket = null;
 const store = new SyncStore({ cid, now: serverNow, send: (m) => socket.send(m) });
+const gameSpeed = createGameSpeed({ clock, send: (m) => socket?.raw(m), me: () => store.pid ?? null, state: () => store.state });
+// another farmer's change (or a refusal of mine) is said once; Settings › Farm repaints itself
+gameSpeed.on((e) => {
+  if (e.refused) { ui.notice?.(t('settings.speed.ownerOnly')); return; }
+  if (!e.changed || !e.by || e.by === store.pid) return;
+  ui.notice?.(t('settings.speed.changed', { name: store.state?.players?.[e.by]?.name ?? '', speed: t(speedKey(e.speed)) }));
+});
 let started = false;
 // The build hash of the files this page runs (SV-03): the server's <meta name="hh-build">, else /api/status at boot
 let myBuild = pageBuild({ meta: document.querySelector('meta[name="hh-build"]')?.content ?? null });
@@ -262,7 +272,7 @@ function onWelcome(w) {
   }
   if (gate === 'mismatch') { ui.hideSlots(); ui.setConnection('mismatch'); return; }
   ui.hideSlots();
-  clock.seed(w.serverNow, performance.now());
+  gameSpeed.welcome(w);                                 // the real-time estimate and the farm's game speed
   // the farm's mod (Harness Hollow): installed before the reset, so pending predictions replay on its content and every
   // panel re-reads it; a welcome without one puts the base game back (an undo to nothing, another farm)
   syncOverlay(w.mod);
@@ -309,6 +319,7 @@ function onWelcome(w) {
     // under the build ghost for a touch player
     const device = createDevice({ options: () => controller.options });
     controller.device = device;
+    controller.speed = gameSpeed;                       // Settings › Farm › Game speed (ui/settings.js)
     window.__hh.device = device;
     window.__hh.touchBuild = createTouchBuild({ controller, view, ui });
     ui.init(store, view, controller);
@@ -337,7 +348,7 @@ function onWelcome(w) {
   for (const p of w.peers || []) {
     view.partner.online(p.pid, p.online);
     ui.setPeer(p.pid, p.online);
-    if (p.pose) view.partner.update([p.pose], w.serverNow);
+    if (p.pose) view.partner.update([p.pose], w.realNow ?? w.serverNow);     // presence runs on real time
     if (!p.online) view.avatars?.ride?.(p.pid, false);
   }
   if (Array.isArray(w.chat) && typeof ui.chatHistory === 'function') ui.chatHistory(w.chat);
@@ -532,6 +543,9 @@ function handle(m) {
     // the in-game helper's pushes (Harness Hollow): the ui lane listens on public/js/harness/bus.js
     case MSG.HX:
       return emitHarness(m);
+    // OnFire: the farm's game speed changed (or my change was refused): game/speed.js
+    case MSG.CLOCK:
+      return gameSpeed.clockFrame(m);
     default:
       return undefined;
   }
@@ -681,7 +695,7 @@ async function boot() {
   const q = ['low', 'medium', 'high', 'eco', 'auto'].includes(params.get('quality')) ? params.get('quality') : 'auto';
   // eco is the low tier plus capped frame rates: the renderer's MSAA is chosen at init, so init low, then eco (UI-16)
   // the player's language is in before anything says a word (i18n: Bulgarian loads only when chosen, in parallel)
-  await Promise.all([view.init(canvas, { quality: q === 'eco' ? 'low' : q, now: serverNow, overlay: document.getElementById('overlay') }), i18nReady()]);
+  await Promise.all([view.init(canvas, { quality: q === 'eco' ? 'low' : q, now: serverNow, realNow, overlay: document.getElementById('overlay') }), i18nReady()]);
   if (q === 'eco') view.setQuality('eco');
   store.on('change', (ch) => view.sync(ch.ids, ch.topics));
   store.on('fx', ({ ev, by, local }) => view.fx.play(ev, undefined, feedback ? feedback.fxMeta(by, local, ev) : { by, local }));
@@ -744,7 +758,7 @@ function clockInfo() {
 
 // Test and debug hook (tech §9.1): the E2E and shot tools drive the game through this.
 window.__hh = {
-  cid, store, view, ui, clock, audio, serverNow,
+  cid, store, view, ui, clock, audio, serverNow, realNow, speed: gameSpeed,
   /** Model and texture files still loading (render/assets.js): tools/boot-perf.mjs reads "every model drawn" here. */
   assetsPending: () => assetsPending(),
   /** How the model packs loaded (net/packs.js): tools/e2e-assets.mjs records it beside a warm reload's bytes. */

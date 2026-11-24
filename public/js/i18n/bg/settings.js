@@ -98,6 +98,18 @@ export default {
   'settings.farm.switch': 'Смени фермера',
   'settings.farm.switchHelp': 'Избери другия фермер на това устройство (в два раздела можете да играете и двамата).',
 
+  // OnFire: скоростта на играта (Настройки › Ферма; game/speed.js)
+  'settings.speed.title': 'Скорост на играта',
+  'settings.speed': 'Скорост',
+  'settings.speed.x0_5': '0,5×',
+  'settings.speed.x1': '1×',
+  'settings.speed.x2': '2×',
+  'settings.speed.x4': '4×',
+  'settings.speed.help': 'Колко бързо тече времето във фермата ви: посеви, животни, работилници, ден и нощ. Всички във фермата играят с тази скорост.',
+  'settings.speed.ownerHelp': '{name} е собственик на фермата и избира скоростта ѝ.',
+  'settings.speed.ownerOnly': 'Само собственикът на фермата може да промени скоростта на играта.',
+  'settings.speed.changed': '{name} промени скоростта на играта на {speed}.',
+
   'settings.credits.loading': 'Зареждаме списъка с музика…',
   'settings.credits.tracks': 'Музика',
   'settings.credits.by': 'от {artist}',
